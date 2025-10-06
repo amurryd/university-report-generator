@@ -1,216 +1,347 @@
-1. Project Overview
+# 🎓 University AI Report Generator
 
-This project demonstrates an AI-powered narrative report generation system. It takes structured university data (students, grades, financial records) and produces Indonesian-language reports via Google Gemini (GenAI). The goal is to showcase integration of AI APIs into a data analytics pipeline, with validation to mitigate hallucinations.
+**Thesis Project**: AI-Powered Narrative Report Generation System  
+**Author**: [Your Name]  
+**University**: [Your University]  
+**Program**: Information Systems
 
-Objectives
+---
 
-Automate report writing from raw data
+## 📋 Project Overview
 
-Maintain factual consistency and reduce hallucinations
+This system automatically generates narrative reports in Indonesian from university data (students, grades, finance) using Google Gemini AI. Built as a demonstration of AI API integration with data processing capabilities.
 
-Produce human-readable output (Markdown)
+### Key Features
+- ✅ Read Excel files (students, grades, finance data)
+- ✅ Generate Indonesian narrative reports using Gemini API
+- ✅ Validate AI outputs for hallucinations
+- ✅ Export as Markdown files with metadata
+- ✅ Modular, beginner-friendly code structure
+- ✅ Comprehensive documentation for thesis
 
-Structure code in modular, understandable components
+---
 
-Serve as a technical artifact for demonstration in your thesis
+## 🏗️ Project Structure
 
-2. Features
-
-Excel Data Input: Load student, grade, and finance data from .xlsx files
-
-AI Narrative Generation: Use Gemini to create narrative reports in Indonesian
-
-Validation Layer: Heuristic checks for inconsistencies or invented claims
-
-Markdown Output: Reports are exported as Markdown files, with metadata
-
-Offline Fallback: If the AI fails, a fallback report template is generated
-
-Modular Design: Clear separation between data, AI, validation, export
-
-3. Project Structure
-university-ai-report-generator/
+```
+university-report-generator/
 │
-├── main.py                   # Entry point / CLI orchestration
-├── config.py                 # API key / environment loading & configurations
-├── data_processor.py         # Read Excel, compute summaries
-├── report_generator.py       # AI prompt construction & Gemini integration
-├── validator.py              # Checking the generated text against data
-├── exporter.py               # Markdown composition & file writing
+├── main.py                  # Main application (run this!)
+├── config.py                # Configuration & API key management
+├── data_processor.py        # Excel reading & data analysis
+├── report_generator.py      # Gemini AI integration
+├── output_manager.py        # Markdown file export
 │
-├── requirements.txt          # Python dependencies
-├── .env.example               # Template for environment variables
-├── README.md                  # Project documentation
+├── requirements.txt         # Python dependencies
+├── .env.example            # API key template (copy to .env)
+├── README.md               # This file
 │
-├── data/                      # Input data files (Excel)
-│   ├── students.xlsx
-│   ├── grades.xlsx
-│   └── finance.xlsx
+├── data/                   # Place your Excel files here
+│   ├── sample_students.xlsx
+│   └── sample_finance.xlsx
 │
-└── reports/                   # Generated output (Markdown)
-    ├── report_YYYYMMDD_HHMMSS.md
+└── reports/                # Generated reports (auto-created)
+    ├── student_reports/
+    ├── finance_reports/
+    └── metadata/
+```
 
-4. Setup & Installation
-4.1 Prerequisites
+---
 
-Python 3.10 or newer
+## 🚀 Installation Guide
 
-Internet access (for calling Gemini API)
+### Step 1: Install Python
+1. Download Python 3.10 or newer from [python.org](https://www.python.org/downloads/)
+2. **Important**: During installation, check "Add Python to PATH"
+3. Verify installation:
+   ```bash
+   python --version
+   ```
 
-A valid Gemini (Generative Language) API key
+### Step 2: Set Up Project
+1. Create a project folder:
+   ```bash
+   mkdir university-report-generator
+   cd university-report-generator
+   ```
 
-4.2 Create and Activate Virtual Environment
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# macOS / Linux
-source venv/bin/activate
+2. Create all the Python files (copy code from artifacts)
 
-4.3 Install Dependencies
-pip install --upgrade pip setuptools wheel
+3. Create virtual environment (recommended):
+   ```bash
+   python -m venv venv
+   ```
+
+4. Activate virtual environment:
+   - **Windows**:
+     ```bash
+     venv\Scripts\activate
+     ```
+   - **macOS/Linux**:
+     ```bash
+     source venv/bin/activate
+     ```
+
+### Step 3: Install Dependencies
+```bash
 pip install -r requirements.txt
+```
 
-4.4 Configure API Key
+This installs:
+- `pandas` - Excel file reading
+- `openpyxl` - Excel format support
+- `numpy` - Data calculations
+- `google-generativeai` - Gemini AI API
+- `python-dotenv` - Environment variable loading
 
-Copy .env.example → .env
+### Step 4: Get Gemini API Key
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Sign in with Google account
+3. Click "Create API Key"
+4. Copy your API key
 
-Edit .env and set:
+### Step 5: Configure API Key
+1. Copy `.env.example` to `.env`:
+   ```bash
+   copy .env.example .env  # Windows
+   # or
+   cp .env.example .env    # macOS/Linux
+   ```
 
-GEMINI_API_KEY=YOUR_API_KEY_HERE
-# Optionally:
-GEMINI_API_URL= (leave blank to use default model endpoint)
+2. Open `.env` and add your API key:
+   ```
+   GEMINI_API_KEY=AIzaSyC1234567890abcdefGHIJKLMNOPQRSTUVWX
+   ```
 
-5. Usage
-5.1 Generate Dummy Data (for demo)
-python main.py --generate-data
+---
 
+## 📊 Preparing Sample Data
 
-This creates sample Excel files in the data/ folder.
+### Student Data Example (sample_students.xlsx)
 
-5.2 Run the Full Pipeline
-python main.py --run
+Create an Excel file with columns like:
+| NIM | Nama | Nilai | IPK | Semester |
+|-----|------|-------|-----|----------|
+| 2101001 | Budi Santoso | 85 | 3.5 | 5 |
+| 2101002 | Siti Aminah | 92 | 3.8 | 5 |
+| 2101003 | Ahmad Fauzi | 78 | 3.2 | 5 |
 
+### Finance Data Example (sample_finance.xlsx)
 
-By default, it will call the AI (if API key is set) and export a report in reports/.
+| Kategori | Pemasukan | Pengeluaran | Bulan |
+|----------|-----------|-------------|-------|
+| SPP | 150000000 | 0 | Januari |
+| Operasional | 0 | 50000000 | Januari |
+| Penelitian | 30000000 | 20000000 | Januari |
 
-To run in offline mode (no API call), use:
+Save these files in the `data/` folder.
 
-python main.py --run --no-api
+---
 
-6. Module Explanations (for Thesis Defense)
-main.py
+## ▶️ Running the Application
 
-Parses command-line flags (--generate-data, --run, --no-api)
+### Basic Usage
+```bash
+python main.py
+```
 
-Coordinates the pipeline: data generation, ETL → AI → validation → export
+You'll see a menu:
+```
+Select an option:
+1. Generate Student Performance Report
+2. Generate Financial Analysis Report
+3. Run Demo (process all sample files)
+4. Exit
+```
 
-Loads environment variables (via dotenv)
+### Demo Mode (Recommended for First Run)
+1. Choose option `3` (Run Demo)
+2. System will process all files in `data/` folder
+3. Reports saved to `reports/` folder
 
-config.py
+### Processing Specific Files
+1. Choose option `1` or `2`
+2. Enter full path to your Excel file
+3. Wait for processing
+4. Check `reports/` for output
 
-Reads environment variables
+---
 
-Provides functions like get_api_key() or get_setting()
+## 🔍 Understanding the Code
 
-Central point of configuration to avoid scattering secrets
+### Module Breakdown
 
-data_processor.py
+#### 1. **main.py** - Application Orchestrator
+- Coordinates all components
+- Handles user interface (CLI menu)
+- Manages the workflow: Read → Analyze → Generate → Save
 
-Reads .xlsx files using pandas and openpyxl
+**Key Functions**:
+- `generate_student_report()` - Process student data
+- `generate_finance_report()` - Process financial data
+- `run_demo()` - Demo mode for presentations
 
-Computes statistical summaries: counts, averages, distributions
+#### 2. **config.py** - Configuration Manager
+- Loads API key securely
+- Manages application settings
+- Reads from `.env` file
 
-Produces structured summaries for prompt insertion
+**Key Functions**:
+- `get_api_key()` - Retrieves Gemini API key
+- `get_setting()` - Gets configuration values
 
-report_generator.py
+#### 3. **data_processor.py** - Data Handler
+- Reads Excel files with pandas
+- Calculates statistics (mean, median, std dev)
+- Detects data type (student/finance)
+- Creates summaries for AI
 
-Constructs prompts (in Indonesian) embedding facts from data
+**Key Functions**:
+- `read_excel()` - Load Excel into DataFrame
+- `analyze_data()` - Calculate all statistics
+- `get_data_summary_for_ai()` - Create text summary
 
-Calls Gemini (via the GenAI SDK) with retry logic
+#### 4. **report_generator.py** - AI Integration
+- Connects to Gemini API
+- Sends prompts to generate reports
+- Validates for hallucinations
+- Handles errors and retries
 
-Parses response to extract the generated text
+**Key Functions**:
+- `generate_report()` - Call Gemini to create report
+- `validate_report()` - Check for fake data
+- `_create_prompt()` - Build AI prompt
 
-Provides fallback if the API fails
+#### 5. **output_manager.py** - File Management
+- Saves reports as Markdown
+- Adds metadata headers
+- Organizes files by type
+- Creates directory structure
 
-validator.py
+**Key Functions**:
+- `save_report()` - Write Markdown file
+- `list_reports()` - Show all generated reports
 
-Parses numbers and keywords from the narrative
+---
 
-Compares extracted numbers to the data summary
+## 🎯 For Your Thesis Presentation
 
-Flags obvious disparities, missing data, or too-short output
+### Explaining to Your Advisor
 
-exporter.py
+**System Flow**:
+1. **Input**: User provides Excel file
+2. **Processing**: System reads data and calculates statistics
+3. **AI Generation**: Gemini creates narrative report in Indonesian
+4. **Validation**: Check for hallucinations/fake data
+5. **Output**: Save as Markdown with metadata
 
-Assembles narrative + facts + validation messages into Markdown format
+**Key Technical Concepts**:
+- **API Integration**: How your code calls external services (Gemini)
+- **Data Processing**: Statistical analysis with pandas
+- **Prompt Engineering**: Crafting good AI instructions
+- **Validation**: Preventing AI hallucinations
+- **Modular Design**: Each file has one clear purpose
 
-Saves file to reports/ with timestamped filename
+### Demo Script
+1. Show the project structure
+2. Explain each module briefly
+3. Run demo mode: `python main.py` → option 3
+4. Show input Excel files
+5. Show generated Markdown reports
+6. Explain validation process
 
-Ensures directory creation and error handling
+---
 
-7. Sample Data Format & Example
-Students / Grades Excel
-StudentID	Name	Department	Grade
-2101001	Budi	TI	3.45
-2101002	Siti	Manajemen	3.72
-Finance Excel
-Year	TuitionIncome	OperationalExpense
-2024	1,200,000,000	950,000,000
+## 🔧 Troubleshooting
 
-These tables feed into summary dicts used to generate narrative.
+### "ModuleNotFoundError"
+```bash
+pip install -r requirements.txt
+```
 
-8. Academic & Technical Context
+### "API key not found"
+- Check `.env` file exists
+- Verify API key is correct
+- No spaces around `=` in `.env`
 
-Research Goals: Demonstrate how AI can assist academic reporting, and how to mitigate hallucinations
+### "FileNotFoundError"
+- Create `data/` folder
+- Place Excel files inside
+- Check file path is correct
 
-Challenges Addressed:
+### "Excel file error"
+- Verify file is `.xlsx` or `.xls`
+- Check file isn't corrupted
+- Ensure file isn't open in Excel
 
-Connecting structured data and free-form narrative
+### "API call failed"
+- Check internet connection
+- Verify API key is valid
+- Check Gemini API quota
 
-Preventing AI from inventing facts
+---
 
-Handling API failures gracefully
+## 📈 Future Enhancements
 
-Limitations:
+Ideas for extending this project:
+- [ ] Add web interface (Flask/FastAPI)
+- [ ] Database integration (PostgreSQL/MySQL)
+- [ ] User authentication
+- [ ] Multiple report templates
+- [ ] PDF export option
+- [ ] Email delivery
+- [ ] Batch processing
+- [ ] Dashboard with charts
 
-Validation is heuristic, not perfect
+---
 
-The system is not fully autonomous
+## 📚 Dependencies Explained
 
-Does not learn or adapt over time
+| Package | Purpose | Thesis Relevance |
+|---------|---------|------------------|
+| pandas | Data manipulation | Core data processing |
+| openpyxl | Excel file support | Input data handling |
+| numpy | Numerical operations | Statistical calculations |
+| google-generativeai | Gemini AI API | AI integration demo |
+| python-dotenv | Environment variables | Security best practice |
 
-9. Roadmap & Future Work
+---
 
-Add a web interface (Flask / FastAPI)
+## 🎓 Academic Notes
 
-Store data in a real database (PostgreSQL, MySQL)
+### Research Questions Addressed:
+1. How can AI assist in automated report generation?
+2. What techniques prevent AI hallucinations?
+3. How to integrate external AI APIs effectively?
 
-Introduce user authentication / role-based access
+### Methodology:
+- **Quantitative**: Statistical analysis of data
+- **Qualitative**: Narrative report generation
+- **Validation**: Hallucination detection algorithms
 
-Extend validation using embeddings, entailment models
+### Technologies Used:
+- **Language**: Python 3.10+
+- **AI Model**: Google Gemini Pro
+- **Data Processing**: pandas, numpy
+- **File Format**: Markdown (human-readable)
 
-Export to PDF, offer email delivery
+---
 
-Batch processing & scheduler
+## 📞 Support
 
-10. Troubleshooting & FAQ
-Problem	Solution
-ModuleNotFoundError	Ensure you installed dependencies in the correct venv
-“API key not set”	Confirm .env exists and contains GEMINI_API_KEY
-FileNotFoundError	Create data/ folder or correct paths
-API call fails	Check internet connectivity, key validity, quota
-11. Dependencies
-pandas
-openpyxl
-numpy
-google-genai
-python-dotenv
-requests
+For issues or questions:
+1. Check troubleshooting section
+2. Review code comments
+3. Test each module independently
+4. Check Gemini API documentation
 
+---
 
-Line up with your requirements.txt.
+## 📄 License
 
-12. License & Acknowledgement
+This project is for educational/thesis purposes.  
+Created by [Your Name] - [Year]
 
-This project is intended for academic / educational use within your thesis.
-Feel free to include a license (e.g. MIT) if you plan to publish it publicly.
+---
+
+**Good luck with your thesis! 🎉**
