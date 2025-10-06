@@ -84,7 +84,7 @@ This installs:
 - `pandas` - Excel file reading
 - `openpyxl` - Excel format support
 - `numpy` - Data calculations
-- `google-generativeai` - Gemini AI API
+- `google-genai` - Gemini AI API
 - `python-dotenv` - Environment variable loading
 
 ### Step 4: Get Gemini API Key
@@ -103,7 +103,7 @@ This installs:
 
 2. Open `.env` and add your API key:
    ```
-   GEMINI_API_KEY=AIzaSyC1234567890abcdefGHIJKLMNOPQRSTUVWX
+   GEMINI_API_KEY=Your_Key
    ```
 
 ---
@@ -339,3 +339,4 @@ Created by [Your Name] - [Year]
 
 
 **Good luck with your thesis! 🎉**
+
