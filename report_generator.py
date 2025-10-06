@@ -1,297 +1,181 @@
-"""
-Report Generator Module
-Integrates with Google Gemini API to generate narrative reports
+# src/generator.py
 
-This is the core AI integration module that:
-- Calls the Gemini API
-- Generates Indonesian-language reports
-- Validates outputs for hallucinations
+"""
+Report Generator Module — updated for Google GenAI SDK
+
+This module:
+- Uses the google-genai (Google GenAI) Python SDK to call Gemini / generative models
+- Builds prompt text from structured facts
+- Has retry/backoff logic for API calls
+- Parses responses and falls back gracefully
+- (Optional) Basic validation logic of output text
 """
 
-import google.genai as genai
+from google.genai import Client
+from google.genai import types
 import time
-from typing import Dict, Any
-
+from typing import Dict, Any, Optional
 
 class ReportGenerator:
-    """
-    Handles AI-powered report generation using Google Gemini
-    
-    This class manages:
-    - API communication with Gemini
-    - Prompt engineering for good reports
-    - Hallucination detection
-    - Error handling and retries
-    """
-    
-    def __init__(self, api_key, model_name='gemini-2.5-flash'):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash"):
         """
-        Initialize the report generator with Gemini API
-        
-        Args:
-            api_key (str): Google Gemini API key
-            model_name (str): Gemini model to use
-                Options: 
-                - 'gemini-2.5-flash' (recommended: best price-performance)
-                - 'gemini-2.5-pro' (highest quality, slower)
-                - 'gemini-2.0-flash' (alternative)
+        Initialize the ReportGenerator with a GenAI client.
         """
-        # Configure the Gemini API
-        genai.configure(api_key=api_key)
-        
-        # Initialize the model
-        self.model = genai.GenerativeModel(model_name)
+        # Create a client instance
+        self.client = Client(api_key=api_key)
         self.model_name = model_name
-        
-        print(f"✓ Report Generator initialized ({model_name})")
-    
-    def generate_report(self, data_summary, report_type="general"):
+        print(f"✓ ReportGenerator initialized with model: {self.model_name}")
+
+    def generate_report(
+        self,
+        data_summary: Dict[str, Any],
+        report_type: str = "general"
+    ) -> str:
         """
-        Generate a narrative report in Indonesian using Gemini AI
-        
+        Generate a narrative report in Indonesian using GenAI.
+
         Args:
-            data_summary (dict): Analysis results from DataProcessor
-            report_type (str): Type of report (student_performance, financial_analysis, etc.)
-            
+            data_summary: dictionary of facts/calculated metrics
+            report_type: controls type of structure (e.g. "student_performance", "financial_analysis", or general)
+
         Returns:
-            str: Generated report in Markdown format
+            Generated text from model, or fallback text if failure.
         """
-        # Create the prompt for Gemini
         prompt = self._create_prompt(data_summary, report_type)
-        
         try:
-            # Call Gemini API with retry logic
-            response = self._call_gemini_with_retry(prompt)
-            
-            # Extract text from response
-            report_text = response.text
-            
-            print(f"  ✓ Generated {len(report_text)} characters")
-            
-            return report_text
-            
+            response = self._call_model_with_retry(prompt)
+            text = response.text  # GenAI SDK response has `.text`
+            print(f"  ✓ Successfully generated {len(text)} characters")
+            return text
         except Exception as e:
-            print(f"  ❌ Error generating report: {str(e)}")
-            # Return a fallback report
+            print(f"  ❌ Error generating report: {e}")
             return self._create_fallback_report(data_summary)
-    
-    def _create_prompt(self, data_summary, report_type):
+
+    def _create_prompt(self, data_summary: Dict[str, Any], report_type: str) -> str:
         """
-        Create a detailed prompt for Gemini based on report type
-        
-        This is crucial for getting good results from the AI.
-        A well-crafted prompt ensures the AI generates accurate,
-        relevant reports.
-        
-        Args:
-            data_summary (dict): The data analysis
-            report_type (str): Type of report
-            
-        Returns:
-            str: Complete prompt for Gemini
+        Construct the prompt text to feed into the model, combining instructions + data summary.
         """
-        # Get the data summary text
+        # You may have a helper to convert data_summary to readable text
         from data_processor import DataProcessor
         processor = DataProcessor()
-        summary_text = processor.get_data_summary_for_ai(data_summary)
-        
-        # Base instructions (always included)
-        base_instructions = """
-Anda adalah seorang analis data universitas yang ahli. Tugas Anda adalah membuat laporan 
-naratif yang profesional dan mudah dipahami berdasarkan data yang diberikan.
+        summary_block = processor.get_data_summary_for_ai(data_summary)
 
-PENTING: Hanya gunakan informasi dari data yang diberikan. Jangan membuat asumsi atau 
-menambahkan informasi yang tidak ada dalam data.
-"""
-        
-        # Specific instructions based on report type
+        base = (
+            "Anda adalah analis data universitas yang ahli. "
+            "Anda hanya boleh menggunakan data yang diberikan — jangan menambahkan informasi eksternal.\n\n"
+        )
+
         if report_type == "student_performance":
-            specific_instructions = """
-Buatlah laporan analisis performa mahasiswa dengan struktur berikut:
-
-1. RINGKASAN EKSEKUTIF (2-3 paragraf)
-   - Gambaran umum data mahasiswa
-   - Temuan utama
-
-2. ANALISIS DETAIL
-   - Distribusi nilai/IPK
-   - Identifikasi pola atau trend
-   - Perbandingan antar kelompok (jika ada)
-
-3. KESIMPULAN DAN REKOMENDASI
-   - Kesimpulan berdasarkan data
-   - Rekomendasi untuk perbaikan
-
-Gunakan format Markdown dengan heading, bullet points, dan penekanan yang sesuai.
-"""
+            spec = (
+                "Struktur laporan:\n"
+                "1. RINGKASAN EKSEKUTIF\n"
+                "2. ANALISIS PERFORMA MAHASISWA (nilai, tren)\n"
+                "3. KESIMPULAN & REKOMENDASI\n\n"
+            )
         elif report_type == "financial_analysis":
-            specific_instructions = """
-Buatlah laporan analisis keuangan dengan struktur berikut:
-
-1. RINGKASAN KEUANGAN (2-3 paragraf)
-   - Overview kondisi keuangan
-   - Highlight angka-angka penting
-
-2. ANALISIS MENDALAM
-   - Breakdown per kategori
-   - Trend pendapatan/pengeluaran
-   - Analisis rasio (jika relevan)
-
-3. KESIMPULAN DAN SARAN
-   - Kesimpulan finansial
-   - Rekomendasi strategis
-
-Gunakan format Markdown. Sertakan angka dengan format yang jelas (Rp untuk rupiah).
-"""
+            spec = (
+                "Struktur laporan:\n"
+                "1. TINJAUAN KEUANGAN\n"
+                "2. ANALISIS DETAIL (pendapatan, pengeluaran, rasio)\n"
+                "3. KESIMPULAN & SARAN\n\n"
+            )
         else:
-            specific_instructions = """
-Buatlah laporan analisis data dengan struktur:
+            spec = (
+                "Struktur laporan umum:\n"
+                "1. Ringkasan\n"
+                "2. Analisis\n"
+                "3. Kesimpulan\n\n"
+            )
 
-1. RINGKASAN
-2. ANALISIS DETAIL
-3. KESIMPULAN
+        prompt = (
+            f"{base}{spec}"
+            f"DATA YANG HARUS DIANALISIS:\n{summary_block}\n\n"
+            "Tulislah laporan naratif dalam Bahasa Indonesia sesuai struktur di atas:"
+        )
 
-Gunakan format Markdown.
-"""
-        
-        # Combine everything
-        full_prompt = f"""{base_instructions}
+        return prompt
 
-{specific_instructions}
-
-DATA YANG HARUS DIANALISIS:
-{summary_text}
-
-Mulai menulis laporan sekarang dalam Bahasa Indonesia:
-"""
-        
-        return full_prompt
-    
-    def _call_gemini_with_retry(self, prompt, max_retries=3):
+    def _call_model_with_retry(self, prompt: str, max_retries: int = 3) -> types.GenerateContentResponse:
         """
-        Call Gemini API with automatic retry on failure
-        
+        Call the GenAI model with retry / exponential backoff.
+
         Args:
-            prompt (str): The prompt to send
-            max_retries (int): Maximum number of retry attempts
-            
+            prompt: prompt string
+            max_retries: number of attempts
+
         Returns:
-            Response object from Gemini
-            
+            The GenAI response object.
+
         Raises:
-            Exception: If all retries fail
+            Exception if all retries fail.
         """
         for attempt in range(max_retries):
             try:
-                # Call the Gemini API
-                response = self.model.generate_content(prompt)
-                return response
-                
+                # Build content object
+                content = types.Content(parts=[types.Part(text=prompt)])
+                resp = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[content]
+                )
+                return resp
             except Exception as e:
                 if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
-                    print(f"  ⚠ API call failed, retrying in {wait_time}s...")
-                    time.sleep(wait_time)
+                    wait = 2 ** attempt
+                    print(f"  ⚠ Attempt {attempt+1} failed, retrying in {wait}s…")
+                    time.sleep(wait)
                 else:
-                    raise Exception(f"API call failed after {max_retries} attempts: {str(e)}")
-    
-    def validate_report(self, report_text, original_data_summary):
+                    raise Exception(f"API call failed after {max_retries} attempts: {e}")
+
+    def validate_report(
+        self,
+        report_text: str,
+        data_summary: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
-        Validate the generated report for potential hallucinations
-        
-        This checks if the AI made up numbers or facts that aren't in the original data.
-        
-        Args:
-            report_text (str): The generated report
-            original_data_summary (dict): Original data analysis
-            
-        Returns:
-            dict: Validation results with is_valid flag and issues list
+        (Optional) Basic validation to catch glaring issues.
+
+        Returns a dict with keys:
+        - is_valid (bool)
+        - issues (list of strings)
+        - num_extracted (int) — number of numeric matches in text
         """
-        issues = []
-        
-        # Extract numbers from the report
         import re
-        numbers_in_report = re.findall(r'\d+(?:\.\d+)?', report_text)
-        
-        # Extract numbers from original data
-        numbers_in_data = set()
-        
-        # Check statistics
-        if 'statistics' in original_data_summary:
-            for col_stats in original_data_summary['statistics'].values():
-                for value in col_stats.values():
-                    if isinstance(value, (int, float)):
-                        numbers_in_data.add(f"{value:.2f}")
-                        numbers_in_data.add(f"{int(value)}")
-        
-        # Add row count
-        numbers_in_data.add(str(original_data_summary.get('row_count', 0)))
-        numbers_in_data.add(str(original_data_summary.get('column_count', 0)))
-        
-        # Check for exact column names mentioned
-        columns = original_data_summary.get('columns', [])
-        for col in columns:
-            if col not in report_text:
-                # This is okay - not all columns need to be mentioned
-                pass
-        
-        # Basic validation checks
+        issues = []
+        numbers = re.findall(r"\d+(?:\.\d+)?", report_text)
+
+        # Example check: too short
         if len(report_text) < 200:
-            issues.append("Report seems too short (less than 200 characters)")
-        
-        if "Data yang diberikan" in report_text or "tidak dapat" in report_text.lower():
-            issues.append("Report may indicate missing or unclear data")
-        
-        # Overall validation result
-        is_valid = len(issues) == 0
-        
+            issues.append("Teks laporan terlalu pendek (<200 karakter)")
+
+        # Example check: presence of placeholder phrases
+        lower = report_text.lower()
+        if "tidak dapat" in lower or "data terbatas" in lower:
+            issues.append("Laporan menyiratkan ketidakpastian atau kekurangan data")
+
         return {
-            'is_valid': is_valid,
-            'issues': issues,
-            'report_length': len(report_text),
-            'numbers_found': len(numbers_in_report)
+            "is_valid": (len(issues) == 0),
+            "issues": issues,
+            "num_extracted": len(numbers),
         }
-    
-    def _create_fallback_report(self, data_summary):
+
+    def _create_fallback_report(self, data_summary: Dict[str, Any]) -> str:
         """
-        Create a basic fallback report if AI generation fails
-        
-        Args:
-            data_summary (dict): Data analysis
-            
-        Returns:
-            str: Basic report in Markdown
+        Return a simple fallback markdown report if AI fails.
         """
         from data_processor import DataProcessor
         processor = DataProcessor()
-        summary = processor.get_data_summary_for_ai(data_summary)
-        
-        fallback = f"""# Laporan Data Universitas
+        summary_block = processor.get_data_summary_for_ai(data_summary)
 
-## Ringkasan
+        fallback = (
+            "# Laporan Universitas (Fallback)\n\n"
+            "Laporan ini dihasilkan berdasarkan data berikut:\n\n"
+            f"{summary_block}\n\n"
+            "*Catatan: AI gagal menghasilkan teks, laporan fallback digunakan.*"
+        )
 
-Laporan ini dibuat secara otomatis berdasarkan data yang tersedia.
-
-## Data Overview
-
-{summary}
-
-## Catatan
-
-Laporan ini dibuat menggunakan template fallback karena terjadi kesalahan 
-dalam proses generasi AI. Untuk laporan yang lebih detail, silakan coba lagi.
-
----
-*Generated by University Report Generator*
-"""
         return fallback
 
 
-# For testing
 if __name__ == "__main__":
-    print("Report Generator module loaded!")
-    print("\nThis module provides:")
-    print("- generate_report(): Generate AI reports using Gemini")
-    print("- validate_report(): Check for hallucinations")
-    print("\nNote: Requires valid Gemini API key to function")
+    print("This is the ReportGenerator module (GenAI version).")
+    print("Instantiate ReportGenerator(api_key, model_name) and call generate_report(...).")
