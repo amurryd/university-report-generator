@@ -1,12 +1,5 @@
 # 🎓 University AI Report Generator
 
-**Thesis Project**: AI-Powered Narrative Report Generation System  
-**Author**: [Your Name]  
-**University**: [Your University]  
-**Program**: Information Systems
-
----
-
 ## 📋 Project Overview
 
 This system automatically generates narrative reports in Indonesian from university data (students, grades, finance) using Google Gemini AI. Built as a demonstration of AI API integration with data processing capabilities.
@@ -343,5 +336,6 @@ This project is for educational/thesis purposes.
 Created by [Your Name] - [Year]
 
 ---
+
 
 **Good luck with your thesis! 🎉**
