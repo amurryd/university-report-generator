@@ -1,12 +1,10 @@
 # main.py
-
 """
 University AI Report Generator
 Main application file — orchestrates the entire report generation process
 
-Author: [Your Name]
-Thesis Project: AI-Powered Report Generation System
-University: [Your University]
+This version includes debug prints to verify metadata (especially token_usage)
+is passed into OutputManager.save_report.
 """
 
 import os
@@ -71,6 +69,13 @@ class UniversityReportApp:
             report_type="student_performance"
         )
 
+        # Debug: show usage_info returned by generator
+        print("DEBUG: generator returned usage_info =", usage_info)
+
+        # normalize usage_info so metadata always contains the key
+        if usage_info is None:
+            usage_info = {"prompt_tokens": None, "output_tokens": None, "total_tokens": None}
+
         # 4. Validate the generated report (only pass the text)
         print("Step 4: Validating report accuracy...")
         validation_result = self.report_generator.validate_report(report_text, analysis)
@@ -79,18 +84,24 @@ class UniversityReportApp:
         else:
             print("✓ Report validated successfully")
 
-        # 5. Save to Markdown (include usage & validation in metadata)
+        # 5. Prepare metadata and save the report (with debug)
+        metadata = {
+            "source_file": excel_file_path,
+            "analysis": analysis,
+            "validation": validation_result,
+            "token_usage": usage_info,
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Debug: show metadata just before saving
+        print("DEBUG: about to save report. metadata keys:", list(metadata.keys()))
+        print("DEBUG: token_usage in metadata:", metadata.get("token_usage"))
+
         print("Step 5: Saving report...")
         output_path = self.output_manager.save_report(
             report_text,
             report_type="student_report",
-            metadata={
-                "source_file": excel_file_path,
-                "analysis": analysis,
-                "validation": validation_result,
-                "token_usage": usage_info,
-                "timestamp": datetime.now().isoformat()
-            }
+            metadata=metadata
         )
 
         print("-" * 60)
@@ -121,6 +132,11 @@ class UniversityReportApp:
             report_type="financial_analysis"
         )
 
+        # Debug: show usage_info returned by generator
+        print("DEBUG: generator returned usage_info =", usage_info)
+        if usage_info is None:
+            usage_info = {"prompt_tokens": None, "output_tokens": None, "total_tokens": None}
+
         # 4. Validate
         print("Step 4: Validating report...")
         validation_result = self.report_generator.validate_report(report_text, analysis)
@@ -129,18 +145,24 @@ class UniversityReportApp:
         else:
             print("✓ Report validated successfully")
 
-        # 5. Save report
+        # 5. Prepare metadata and save (with debug)
+        metadata = {
+            "source_file": excel_file_path,
+            "analysis": analysis,
+            "validation": validation_result,
+            "token_usage": usage_info,
+            "timestamp": datetime.now().isoformat()
+        }
+
+        # Debug: show metadata just before saving
+        print("DEBUG: about to save report. metadata keys:", list(metadata.keys()))
+        print("DEBUG: token_usage in metadata:", metadata.get("token_usage"))
+
         print("Step 5: Saving report...")
         output_path = self.output_manager.save_report(
             report_text,
             report_type="finance_report",
-            metadata={
-                "source_file": excel_file_path,
-                "analysis": analysis,
-                "validation": validation_result,
-                "token_usage": usage_info,
-                "timestamp": datetime.now().isoformat()
-            }
+            metadata=metadata
         )
 
         print("-" * 60)
