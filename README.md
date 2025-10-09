@@ -332,11 +332,5 @@ For issues or questions:
 
 ## 📄 License
 
-This project is for educational/thesis purposes.  
-Created by [Your Name] - [Year]
-
----
-
-
-**Good luck with your thesis! 🎉**
+This project is for educational/thesis purposes. 
 
