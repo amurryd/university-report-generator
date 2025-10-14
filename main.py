@@ -58,6 +58,10 @@ class UniversityReportApp:
         print("Step 1: Reading Excel data...")
         student_data = self.data_processor.read_excel(excel_file_path)
 
+        # 1,5. Cleaning the data
+        print("Step 1.5: Cleaning data...")
+        student_data = self.data_processor.clean_data(student_data)
+
         # 2. Analyze data
         print("Step 2: Analyzing data...")
         analysis = self.data_processor.analyze_data(student_data)
@@ -120,6 +124,10 @@ class UniversityReportApp:
         # 1. Read finance data
         print("Step 1: Reading financial data...")
         finance_data = self.data_processor.read_excel(excel_file_path)
+
+        # 1,5. Cleaning the data
+        print("Step 1.5: Cleaning data...")
+        finance_data = self.data_processor.clean_data(finance_data)
 
         # 2. Analyze finance data
         print("Step 2: Analyzing financial metrics...")
