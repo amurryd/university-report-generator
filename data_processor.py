@@ -84,9 +84,15 @@ class DataProcessor:
             'summary': {}
         }
         
+        detected_type = self._detect_data_type(df)
+        
         # Analyze numeric columns
         numeric_cols = df.select_dtypes(include=[np.number]).columns
-        
+
+        if detected_type == "student":
+            exclude_keywords = ['nim', 'id', 'kode']
+            numeric_cols = [col for col in numeric_cols if not any(k in col.lower() for k in exclude_keywords)]
+
         for col in numeric_cols:
             # Calculate statistics for each numeric column
             analysis['statistics'][col] = {
@@ -112,7 +118,7 @@ class DataProcessor:
             }
         
         # Detect data type (student, finance, etc.)
-        analysis['detected_type'] = self._detect_data_type(df)
+        analysis['detected_type'] = detected_type
         
         return analysis
     

@@ -40,7 +40,7 @@ def create_student_data():
         else:
             ipk = round(random.uniform(2.5, 3.0), 2)
         
-        semester = random.choice([4, 5, 6])
+        semester = random.choice([1, 2, 3, 4, 5, 6, 7, 8])
         
         data.append({
             'NIM': nim,
