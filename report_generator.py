@@ -70,34 +70,44 @@ class ReportGenerator:
         summary_block = processor.get_data_summary_for_ai(data_summary)
 
         base = (
-            "Anda adalah analis data universitas yang ahli. "
-            "Gunakan hanya data yang diberikan — jangan menambahkan informasi eksternal.\n\n"
-        )
+           "Anda adalah analis institusi universitas yang sangat berpengalaman. "
+           "Tugas Anda adalah menyusun laporan analitis yang terstruktur, informatif, dan formal "
+           "berdasarkan data yang diberikan di bawah ini. "
+           "Gunakan hanya informasi yang tersedia dalam data — jangan membuat asumsi atau menambahkan data eksternal.\n\n"        
+           )
 
         if report_type == "student_performance":
             spec = (
-                "Struktur laporan:\n"
-                "1. RINGKASAN EKSEKUTIF\n"
-                "2. ANALISIS PERFORMA MAHASISWA (nilai, tren)\n"
-                "3. KESIMPULAN & REKOMENDASI\n\n"
-            )
+               "Tulis laporan performa mahasiswa dengan format berikut:\n"
+               "1. RINGKASAN EKSEKUTIF — ringkas temuan utama (jumlah mahasiswa, tren nilai, status aktif, dsb.)\n"
+               "2. ANALISIS PERFORMA — bahas analisis nilai (rata-rata, tren, variasi), IPK, dan kategori status\n"
+               "3. KESIMPULAN & REKOMENDASI — simpulkan temuan dan berikan saran kebijakan atau tindakan\n\n"
+               )
         elif report_type == "financial_analysis":
             spec = (
-                "Struktur laporan:\n"
-                "1. TINJAUAN KEUANGAN\n"
-                "2. ANALISIS DETAIL (pendapatan, pengeluaran, rasio)\n"
-                "3. KESIMPULAN & SARAN\n\n"
-            )
+                "Tulis laporan keuangan institusi dengan format berikut:\n"
+                "1. TINJAUAN KEUANGAN — gambaran umum kondisi keuangan\n"
+                "2. ANALISIS DETAIL — bahas pendapatan, pengeluaran, rasio penting, serta tren utama\n"
+                "3. KESIMPULAN & SARAN — simpulkan dan berikan rekomendasi strategis\n\n"
+                )
         else:
             spec = (
-                "Struktur laporan umum:\n"
-                "1. Ringkasan\n"
-                "2. Analisis\n"
-                "3. Kesimpulan\n\n"
+                "Tulis laporan analitis umum dengan format berikut:\n"
+                "1. Ringkasan Umum\n"
+                "2. Analisis Data\n"
+                "3. Kesimpulan & Rekomendasi\n\n"
             )
+            
+        style = (
+            "Gaya penulisan:\n"
+            "- Gunakan Bahasa Indonesia yang formal dan jelas.\n"
+            "- Jangan hanya menyalin angka; jelaskan makna statistiknya (misalnya: tren IPK, jurusan dominan, variasi nilai).\n"
+            "- Gunakan paragraf terstruktur, bukan bullet list.\n"
+            "- Jika relevan, hubungkan temuan numerik dan kategorikal untuk memberikan insight.\n\n"    
+        )
 
         prompt = (
-            f"{base}{spec}"
+            f"{base}{spec}{style}"
             f"DATA YANG HARUS DIANALISIS:\n{summary_block}\n\n"
             "Tulislah laporan naratif dalam Bahasa Indonesia sesuai struktur di atas:"
         )

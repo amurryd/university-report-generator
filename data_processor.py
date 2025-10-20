@@ -62,6 +62,66 @@ class DataProcessor:
             
         except Exception as e:
             raise ValueError(f"Error reading Excel file: {str(e)}")
+        
+    def clean_data(self, df):
+        """
+        Clean and standardize the dataset.
+        
+        This function:
+        - Removes duplicate rows
+        - Drops empty columns
+        - Converts numeric-like text to numbers
+        - Fills missing values (numeric with mean, categorical with mode)
+        
+        Args:
+            df (pandas.DataFrame): Raw dataframe to clean
+            
+        Returns:
+            pandas.DataFrame: Cleaned dataframe
+        """
+        df = df.copy()
+
+        # 1. Remove duplicates
+        before_rows = len(df)
+        df = df.drop_duplicates()
+        after_rows = len(df)
+        duplicates_removed = before_rows - after_rows
+
+        # 2. Drop fully empty columns
+        empty_cols = df.columns[df.isna().all()].tolist()
+        df = df.dropna(axis=1, how='all')
+
+        # 3. Convert strings to numeric where possible
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                new_col = df[col].str.replace(',', '.', regex=True)
+                try:
+                    df[col] = pd.to_numeric(new_col)
+                except Exception: 
+                    # If conversion fails, keep original (string) column
+                    df[col] = new_col
+
+        # 4. Fill missing numeric values with mean
+        num_cols = list(df.select_dtypes(include=[np.number]).columns)
+        for col in num_cols:
+            mean_val = df[col].mean()
+            # Assign with loc to avoid chained assignment warnings
+            df.loc[:, col] = df[col].fillna(mean_val)
+        
+        # 5. Fill missing categorical values with mode
+        cat_cols = list(df.select_dtypes(include=['object']).columns)
+        for col in cat_cols:
+            if df[col].isna().any():
+                mode_series = df[col].mode()
+                if not mode_series.empty:
+                    mode_val = mode_series[0]
+                else:
+                    mode_val = ""
+                df.loc[:, col] = df[col].fillna(mode_val)
+        
+        print(f"  ✓ Cleaned data: removed {duplicates_removed} duplicates, dropped {len(empty_cols)} empty columns")
+        return df
+
     
     def analyze_data(self, df):
         """
@@ -84,9 +144,15 @@ class DataProcessor:
             'summary': {}
         }
         
+        detected_type = self._detect_data_type(df)
+        
         # Analyze numeric columns
         numeric_cols = df.select_dtypes(include=[np.number]).columns
-        
+
+        if detected_type == "student":
+            exclude_keywords = ['nim', 'id', 'kode']
+            numeric_cols = [col for col in numeric_cols if not any(k in col.lower() for k in exclude_keywords)]
+
         for col in numeric_cols:
             # Calculate statistics for each numeric column
             analysis['statistics'][col] = {
@@ -112,7 +178,7 @@ class DataProcessor:
             }
         
         # Detect data type (student, finance, etc.)
-        analysis['detected_type'] = self._detect_data_type(df)
+        analysis['detected_type'] = detected_type
         
         return analysis
     
