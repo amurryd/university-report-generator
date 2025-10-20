@@ -47,6 +47,7 @@ reports/
 # Data files (optional - comment out if you want to commit sample data)
 data/*.xlsx
 data/*.xls
+data/*.csv
 
 # OS
 .DS_Store

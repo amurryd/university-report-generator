@@ -3,8 +3,7 @@
 University AI Report Generator
 Main application file — orchestrates the entire report generation process
 
-This version includes debug prints to verify metadata (especially token_usage)
-is passed into OutputManager.save_report.
+This version now reads CSV files instead of Excel.
 """
 
 import os
@@ -46,19 +45,16 @@ class UniversityReportApp:
 
         print("✓ Application initialized successfully\n")
 
-    def generate_student_report(self, excel_file_path: str) -> str:
-        """
-        Generate a report for student performance data.
-        Returns the path to the generated Markdown file.
-        """
-        print(f"Processing: {excel_file_path}")
+    def generate_student_report(self, csv_file_path: str) -> str:
+        """Generate a report for student performance data."""
+        print(f"Processing: {csv_file_path}")
         print("-" * 60)
 
-        # 1. Read Excel data
-        print("Step 1: Reading Excel data...")
-        student_data = self.data_processor.read_excel(excel_file_path)
+        # 1. Read CSV data
+        print("Step 1: Reading CSV data...")
+        student_data = self.data_processor.read_csv(csv_file_path)
 
-        # 1,5. Cleaning the data
+        # 1.5 Cleaning the data
         print("Step 1.5: Cleaning data...")
         student_data = self.data_processor.clean_data(student_data)
 
@@ -73,14 +69,11 @@ class UniversityReportApp:
             report_type="student_performance"
         )
 
-        # Debug: show usage_info returned by generator
         print("DEBUG: generator returned usage_info =", usage_info)
-
-        # normalize usage_info so metadata always contains the key
         if usage_info is None:
             usage_info = {"prompt_tokens": None, "output_tokens": None, "total_tokens": None}
 
-        # 4. Validate the generated report (only pass the text)
+        # 4. Validate the generated report
         print("Step 4: Validating report accuracy...")
         validation_result = self.report_generator.validate_report(report_text, analysis)
         if not validation_result["is_valid"]:
@@ -88,16 +81,15 @@ class UniversityReportApp:
         else:
             print("✓ Report validated successfully")
 
-        # 5. Prepare metadata and save the report (with debug)
+        # 5. Save report
         metadata = {
-            "source_file": excel_file_path,
+            "source_file": csv_file_path,
             "analysis": analysis,
             "validation": validation_result,
             "token_usage": usage_info,
             "timestamp": datetime.now().isoformat()
         }
 
-        # Debug: show metadata just before saving
         print("DEBUG: about to save report. metadata keys:", list(metadata.keys()))
         print("DEBUG: token_usage in metadata:", metadata.get("token_usage"))
 
@@ -113,34 +105,30 @@ class UniversityReportApp:
         print(f"📄 Saved to: {output_path}\n")
         return output_path
 
-    def generate_finance_report(self, excel_file_path: str) -> str:
-        """
-        Generate a financial analysis report.
-        Returns the path to the generated file.
-        """
-        print(f"Processing: {excel_file_path}")
+    def generate_finance_report(self, csv_file_path: str) -> str:
+        """Generate a financial analysis report."""
+        print(f"Processing: {csv_file_path}")
         print("-" * 60)
 
-        # 1. Read finance data
-        print("Step 1: Reading financial data...")
-        finance_data = self.data_processor.read_excel(excel_file_path)
+        # 1. Read CSV data
+        print("Step 1: Reading financial CSV data...")
+        finance_data = self.data_processor.read_csv(csv_file_path)
 
-        # 1,5. Cleaning the data
+        # 1.5 Cleaning
         print("Step 1.5: Cleaning data...")
         finance_data = self.data_processor.clean_data(finance_data)
 
-        # 2. Analyze finance data
+        # 2. Analyze
         print("Step 2: Analyzing financial metrics...")
         analysis = self.data_processor.analyze_data(finance_data)
 
-        # 3. Generate AI report + usage
+        # 3. Generate report
         print("Step 3: Generating financial report...")
         report_text, usage_info = self.report_generator.generate_report(
             data_summary=analysis,
             report_type="financial_analysis"
         )
 
-        # Debug: show usage_info returned by generator
         print("DEBUG: generator returned usage_info =", usage_info)
         if usage_info is None:
             usage_info = {"prompt_tokens": None, "output_tokens": None, "total_tokens": None}
@@ -153,16 +141,15 @@ class UniversityReportApp:
         else:
             print("✓ Report validated successfully")
 
-        # 5. Prepare metadata and save (with debug)
+        # 5. Save report
         metadata = {
-            "source_file": excel_file_path,
+            "source_file": csv_file_path,
             "analysis": analysis,
             "validation": validation_result,
             "token_usage": usage_info,
             "timestamp": datetime.now().isoformat()
         }
 
-        # Debug: show metadata just before saving
         print("DEBUG: about to save report. metadata keys:", list(metadata.keys()))
         print("DEBUG: token_usage in metadata:", metadata.get("token_usage"))
 
@@ -179,13 +166,11 @@ class UniversityReportApp:
         return output_path
 
     def run_demo(self):
-        """
-        Run demonstration mode: process sample student + finance files.
-        """
+        """Run demo mode with sample CSVs."""
         print("\n🎓 DEMO MODE - University Report Generator\n")
         sample_files = {
-            "students": "data/sample_students.xlsx",
-            "finance": "data/sample_finance.xlsx"
+            "students": "data/sample_students.csv",
+            "finance": "data/sample_finance.csv"
         }
 
         results = []
@@ -208,25 +193,24 @@ class UniversityReportApp:
             print("  -", r)
         print()
 
+
 def main():
-    """
-    Main entry point when running `python main.py`.
-    """
+    """Main entry point when running `python main.py`."""
     try:
         app = UniversityReportApp()
 
         print("Select an option:")
         print("1. Generate Student Performance Report")
         print("2. Generate Financial Analysis Report")
-        print("3. Run Demo (process all sample files)")
+        print("3. Run Demo (process all sample CSV files)")
         print("4. Exit")
 
         choice = input("\nEnter your choice (1-4): ").strip()
         if choice == "1":
-            fp = input("Enter path to student Excel file: ").strip()
+            fp = input("Enter path to student CSV file: ").strip()
             app.generate_student_report(fp)
         elif choice == "2":
-            fp = input("Enter path to finance Excel file: ").strip()
+            fp = input("Enter path to finance CSV file: ").strip()
             app.generate_finance_report(fp)
         elif choice == "3":
             app.run_demo()
@@ -240,6 +224,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         print("Please check your configuration and try again.")
+
 
 if __name__ == "__main__":
     main()
