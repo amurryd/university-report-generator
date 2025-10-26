@@ -30,6 +30,25 @@ class DataProcessor:
         """Initialize the data processor"""
         print("✓ Data Processor initialized")
     
+    def read_multiple_csvs(self, file_paths):
+        frames = []
+        for fp in file_paths:
+            try:
+                df = pd.read_csv(fp, encoding='utf-8-sig')
+                df["source_file"] = Path(fp).name
+                frames.append(df)
+                print(f" ✓ Loaded {fp} ({len(df)} rows)")
+            except Exception as e:
+                print(f" ❌ Failed to read {fp}: {e}")
+        
+        if frames:
+            combined_df = pd.concat(frames, ignore_index=True, sort=False)
+            print(f"✅ Combined {len(frames)} CSVs ({len(combined_df)} total rows)")
+            return combined_df
+        else:
+            print("⚠ No valid CSV files provided.")
+            return pd.DataFrame()
+
     def read_csv(self, file_path):
         """
         Read data from a CSV file
@@ -133,18 +152,27 @@ class DataProcessor:
         return analysis
     
     def _detect_data_type(self, df):
-        """Detect data type (student, finance, or unknown)"""
         columns_lower = [col.lower() for col in df.columns]
+        joined = ' '.join(columns_lower)
         
         student_keywords = ['student', 'mahasiswa', 'nama', 'grade', 'nilai', 'ipk', 'gpa']
-        if any(keyword in ' '.join(columns_lower) for keyword in student_keywords):
-            return 'student'
-        
         finance_keywords = ['finance', 'keuangan', 'biaya', 'pembayaran', 'tagihan', 'revenue', 'expense']
-        if any(keyword in ' '.join(columns_lower) for keyword in finance_keywords):
-            return 'finance'
+        akreditasi_keywords = ['akreditasi', 'program', 'dosen', 'kurikulum', 'sk', 'unggul', 'prodi']
         
-        return 'unknown'
+        is_student = any(k in joined for k in student_keywords)
+        is_finance = any(k in joined for k in finance_keywords)
+        is_akreditasi = any(k in joined for k in akreditasi_keywords)
+        
+        if sum([is_student, is_finance, is_akreditasi]) > 1:
+            return "mixed"
+        elif is_student:
+            return "student"
+        elif is_finance:
+            return "finance"
+        elif is_akreditasi:
+            return "akreditasi"
+        else:
+            return "unknown"
     
     def get_data_summary_for_ai(self, analysis):
         """Convert analysis dict into AI-readable text summary"""

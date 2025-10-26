@@ -3,7 +3,8 @@
 University AI Report Generator
 Main application file — orchestrates the entire report generation process
 
-This version now reads CSV files instead of Excel.
+This version now fetches multiple CSVs (via API or local), aggregates them,
+cleans/analyzes, generates one unified report, then exports to Markdown + HTML.
 """
 
 import os
@@ -11,30 +12,33 @@ from datetime import datetime
 from pathlib import Path
 
 # Import your custom modules
+from config import Config
+from data_aggregator import DataAggregator
 from data_processor import DataProcessor
 from report_generator import ReportGenerator
 from output_manager import OutputManager
-from config import Config
 
 
 class UniversityReportApp:
     """
     Main application class that coordinates all components:
-    - Data reading / processing
-    - AI report generation (Gemini / GenAI)
+    - Data ingestion / aggregation (multiple CSVs) 
+    - Data cleaning / processing
+    - AI report generation
     - Validation
-    - Export to Markdown
+    - Export to Markdown + HTML
     """
 
     def __init__(self):
         print("=" * 60)
-        print("UNIVERSITY AI REPORT GENERATOR")
+        print("UNIVERSITY AI REPORT GENERATOR – Unified Report Mode")
         print("=" * 60)
 
         # Load config (API keys, settings)
         self.config = Config()
 
         # Initialize modules
+        self.aggregator = DataAggregator(cache_dir=str(self.config.CACHE_DIR), verbose=True)
         self.data_processor = DataProcessor()
 
         model_name = self.config.get_setting("model_name", "gemini-2.5-flash")
@@ -45,176 +49,104 @@ class UniversityReportApp:
 
         print("✓ Application initialized successfully\n")
 
-    def generate_student_report(self, csv_file_path: str) -> str:
-        """Generate a report for student performance data."""
-        print(f"Processing: {csv_file_path}")
-        print("-" * 60)
+    def generate_unified_report(self) -> str:
+        """
+        Generate a unified institutional report by:
+         1. Ingesting multiple data sources
+         2. Aggregating into one DataFrame
+         3. Cleaning and analyzing data
+         4. Generating AI narrative report
+         5. Saving report (Markdown + HTML)
+        """
+        print("Step 0: Preparing to ingest multiple data sources...")
+        sources = self.config.get_ingestion_sources()
+        print(f"Sources to ingest: {sources}")
 
-        # 1. Read CSV data
-        print("Step 1: Reading CSV data...")
-        student_data = self.data_processor.read_csv(csv_file_path)
+        # 1. Ingest & aggregate
+        print("Step 1: Aggregating data from all sources...")
+        combined_df = self.aggregator.ingest(sources, cache=True)
 
-        # 1.5 Cleaning the data
-        print("Step 1.5: Cleaning data...")
-        student_data = self.data_processor.clean_data(student_data)
+        # 2. Clean data
+        print("Step 2: Cleaning combined data...")
+        cleaned_df = self.data_processor.clean_data(combined_df)
 
-        # 2. Analyze data
-        print("Step 2: Analyzing data...")
-        analysis = self.data_processor.analyze_data(student_data)
+        # 3. Analyze data
+        print("Step 3: Analyzing combined dataset...")
+        analysis = self.data_processor.analyze_data(cleaned_df)
 
-        # 3. Generate AI report + token usage
-        print("Step 3: Generating AI report (calling Gemini API)...")
+        # 4. Generate AI report
+        print("Step 4: Generating unified report (calling Gemini API)...")
         report_text, usage_info = self.report_generator.generate_report(
             data_summary=analysis,
-            report_type="student_performance"
+            report_type="combined"  # ensure this matches JSON template in prompts/
         )
-
         print("DEBUG: generator returned usage_info =", usage_info)
         if usage_info is None:
             usage_info = {"prompt_tokens": None, "output_tokens": None, "total_tokens": None}
 
-        # 4. Validate the generated report
-        print("Step 4: Validating report accuracy...")
+        # 5. Validate
+        print("Step 5: Validating report accuracy...")
         validation_result = self.report_generator.validate_report(report_text, analysis)
         if not validation_result["is_valid"]:
             print(f"⚠ Warning: Potential issues detected: {validation_result['issues']}")
         else:
             print("✓ Report validated successfully")
 
-        # 5. Save report
+        # 6. Save report
         metadata = {
-            "source_file": csv_file_path,
+            "source_files": sources,
             "analysis": analysis,
             "validation": validation_result,
             "token_usage": usage_info,
             "timestamp": datetime.now().isoformat()
         }
-
         print("DEBUG: about to save report. metadata keys:", list(metadata.keys()))
         print("DEBUG: token_usage in metadata:", metadata.get("token_usage"))
 
-        print("Step 5: Saving report...")
+        print("Step 7: Saving report...")
         output_path = self.output_manager.save_report(
             report_text,
-            report_type="student_report",
+            report_type="unified_report",
             metadata=metadata
         )
 
         print("-" * 60)
-        print("✓ Report generated successfully!")
-        print(f"📄 Saved to: {output_path}\n")
-        return output_path
-
-    def generate_finance_report(self, csv_file_path: str) -> str:
-        """Generate a financial analysis report."""
-        print(f"Processing: {csv_file_path}")
-        print("-" * 60)
-
-        # 1. Read CSV data
-        print("Step 1: Reading financial CSV data...")
-        finance_data = self.data_processor.read_csv(csv_file_path)
-
-        # 1.5 Cleaning
-        print("Step 1.5: Cleaning data...")
-        finance_data = self.data_processor.clean_data(finance_data)
-
-        # 2. Analyze
-        print("Step 2: Analyzing financial metrics...")
-        analysis = self.data_processor.analyze_data(finance_data)
-
-        # 3. Generate report
-        print("Step 3: Generating financial report...")
-        report_text, usage_info = self.report_generator.generate_report(
-            data_summary=analysis,
-            report_type="financial_analysis"
-        )
-
-        print("DEBUG: generator returned usage_info =", usage_info)
-        if usage_info is None:
-            usage_info = {"prompt_tokens": None, "output_tokens": None, "total_tokens": None}
-
-        # 4. Validate
-        print("Step 4: Validating report...")
-        validation_result = self.report_generator.validate_report(report_text, analysis)
-        if not validation_result["is_valid"]:
-            print(f"⚠ Warning: Potential issues detected: {validation_result['issues']}")
-        else:
-            print("✓ Report validated successfully")
-
-        # 5. Save report
-        metadata = {
-            "source_file": csv_file_path,
-            "analysis": analysis,
-            "validation": validation_result,
-            "token_usage": usage_info,
-            "timestamp": datetime.now().isoformat()
-        }
-
-        print("DEBUG: about to save report. metadata keys:", list(metadata.keys()))
-        print("DEBUG: token_usage in metadata:", metadata.get("token_usage"))
-
-        print("Step 5: Saving report...")
-        output_path = self.output_manager.save_report(
-            report_text,
-            report_type="finance_report",
-            metadata=metadata
-        )
-
-        print("-" * 60)
-        print("✓ Financial report generated!")
+        print("✓ Unified report generated successfully!")
         print(f"📄 Saved to: {output_path}\n")
         return output_path
 
     def run_demo(self):
-        """Run demo mode with sample CSVs."""
-        print("\n🎓 DEMO MODE - University Report Generator\n")
-        sample_files = {
-            "students": "data/sample_students.csv",
-            "finance": "data/sample_finance.csv"
-        }
-
-        results = []
-        for dtype, path in sample_files.items():
-            if os.path.exists(path):
-                print(f"\n📊 Processing {dtype} data...")
-                if dtype == "students":
-                    report = self.generate_student_report(path)
-                else:
-                    report = self.generate_finance_report(path)
-                results.append(report)
-            else:
-                print(f"⚠ Sample file not found: {path}. Please place a sample file in folder 'data'.")
-
+        """
+        Run demonstration mode: ingest sample CSVs + generate unified report.
+        """
+        print("\n🎓 DEMO MODE – Unified Institutional Report\n")
+        output_path = None
+        try:
+            output_path = self.generate_unified_report()
+        except Exception as e:
+            print(f"❌ Error during demo: {e}")
         print("\n" + "=" * 60)
         print("DEMO COMPLETE!")
         print("=" * 60)
-        print(f"Generated {len(results)} reports:")
-        for r in results:
-            print("  -", r)
+        if output_path:
+            print(f"Generated report: {output_path}")
         print()
 
-
 def main():
-    """Main entry point when running `python main.py`."""
+    """
+    Main entry point when running `python main.py`.
+    """
     try:
         app = UniversityReportApp()
 
         print("Select an option:")
-        print("1. Generate Student Performance Report")
-        print("2. Generate Financial Analysis Report")
-        print("3. Run Demo (process all sample CSV files)")
-        print("4. Exit")
+        print("1. Generate Unified Institutional Report")
+        print("2. Exit")
 
-        choice = input("\nEnter your choice (1-4): ").strip()
+        choice = input("\nEnter your choice (1-2): ").strip()
         if choice == "1":
-            fp = input("Enter path to student CSV file: ").strip()
-            app.generate_student_report(fp)
+            app.generate_unified_report()
         elif choice == "2":
-            fp = input("Enter path to finance CSV file: ").strip()
-            app.generate_finance_report(fp)
-        elif choice == "3":
-            app.run_demo()
-        elif choice == "4":
             print("Goodbye!")
         else:
             print("Invalid choice. Please run again.")
@@ -224,7 +156,6 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         print("Please check your configuration and try again.")
-
 
 if __name__ == "__main__":
     main()

@@ -1,9 +1,6 @@
 """
 Configuration Module
-Handles API keys and application settings
-
-This module manages sensitive information like API keys
-and application-wide settings
+Handles API keys, API endpoints, and application settings
 """
 
 import os
@@ -13,98 +10,127 @@ from pathlib import Path
 class Config:
     """
     Configuration manager for the application
-    
+
     Responsibilities:
     - Load API keys securely
-    - Manage application settings
+    - Manage application and data ingestion settings
     - Provide easy access to configuration values
     """
-    
+
     def __init__(self):
         """Initialize configuration by loading environment variables"""
-        # Load API key from environment variable (secure method)
-        self.api_key = os.getenv('GEMINI_API_KEY')
-        
-        # If not in environment, try to load from .env file
+        # Load API key from environment variable or .env file
+        self.api_key = os.getenv("GEMINI_API_KEY")
         if not self.api_key:
             self._load_from_env_file()
-        
-        # Application settings
+
+        # Base application settings
         self.settings = {
-            'max_retries': 3,  # How many times to retry API calls
-            'timeout': 30,  # API timeout in seconds
-            'language': 'id',  # Indonesian language code
-            'temperature': 0.7,  # AI creativity (0.0 = focused, 1.0 = creative)
-            'model_name': 'gemini-2.5-flash',  # Latest Gemini model (Oct 2024)
-            # Options: 'gemini-2.5-flash' (best), 'gemini-2.5-pro' (highest quality)
+            "max_retries": 3,
+            "timeout": 30,
+            "language": "id",
+            "temperature": 0.7,
+            "model_name": "gemini-2.5-flash",
         }
-    
+
+        # ==============================
+        # DATA INGESTION CONFIGURATION
+        # ==============================
+
+        # Base URL for local fake API (FastAPI)
+        self.API_BASE_URL = os.getenv("FAKE_API_BASE_URL", "http://127.0.0.1:8000")
+
+        # Local fallback dataset folders
+        self.LOCAL_DATA_PATHS = {
+            "student": "data/students",
+            "finance": "data/finance",
+            "akreditasi": "data/akreditasi/sample_akreditasi.csv",
+        }
+
+        # API endpoints for fetching CSVs
+        self.API_ENDPOINTS = {
+            "student": f"{self.API_BASE_URL}/data/student",
+            "finance": f"{self.API_BASE_URL}/data/finance",
+            "akreditasi": f"{self.API_BASE_URL}/data/akreditasi",
+        }
+
+        # Aggregation & report settings
+        # Default to local if not explicitly overridden
+        self.AGGREGATION_MODE = os.getenv("AGGREGATION_MODE", "local").lower()
+
+        # Cache directory
+        self.CACHE_DIR = Path("data")
+
+        print(f"🔧 Aggregation mode set to: {self.AGGREGATION_MODE}")
+
+    # ------------------------------------------------------
+    # Internal helper methods
+    # ------------------------------------------------------
+
     def _load_from_env_file(self):
-        """
-        Load API key from .env file
-        This is a fallback if environment variable is not set
-        """
-        env_file = Path('.env')
-        
+        """Load API key from .env file"""
+        env_file = Path(".env")
         if env_file.exists():
-            with open(env_file, 'r', encoding='utf-8') as f:
+            with open(env_file, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
-                    # Skip comments and empty lines
-                    if line and not line.startswith('#'):
-                        if '=' in line:
-                            key, value = line.split('=', 1)
-                            if key.strip() == 'GEMINI_API_KEY':
+                    if line and not line.startswith("#"):
+                        if "=" in line:
+                            key, value = line.split("=", 1)
+                            if key.strip() == "GEMINI_API_KEY":
                                 self.api_key = value.strip()
                                 break
-    
+
+    # ------------------------------------------------------
+    # Public methods
+    # ------------------------------------------------------
+
     def get_api_key(self):
-        """
-        Get the Gemini API key
-        
-        Returns:
-            str: API key
-            
-        Raises:
-            ValueError: If API key is not configured
-        """
+        """Return Gemini API key or raise error if not set"""
         if not self.api_key:
             raise ValueError(
-                "Gemini API key not found!\n"
-                "Please set it in one of these ways:\n"
-                "1. Create a .env file with: GEMINI_API_KEY=your_key_here\n"
-                "2. Set environment variable: set GEMINI_API_KEY=your_key_here"
+                "Gemini API key not found! Please configure it in .env or as environment variable."
             )
         return self.api_key
-    
-    def get_setting(self, key, default=None):
+
+    def get_ingestion_sources(self):
         """
-        Get a configuration setting
-        
-        Args:
-            key (str): Setting name
-            default: Default value if setting doesn't exist
-            
+        Get a list of CSV sources (URLs or local paths) based on aggregation mode.
+
         Returns:
-            Setting value or default
+            list[str]: List of CSV URLs or file paths
         """
+        if self.AGGREGATION_MODE == "api":
+            print("🌐 Using API-based data ingestion")
+            return list(self.API_ENDPOINTS.values())
+        else:
+            print("📁 Using local CSV-based data ingestion")
+            sources = []
+            for path in self.LOCAL_DATA_PATHS.values():
+                path_obj = Path(path)
+                if path_obj.is_dir():
+                    # Load all CSVs from folder
+                    csv_files = sorted(path_obj.glob("*.csv"))
+                    sources.extend([str(p) for p in csv_files])
+                elif path_obj.exists():
+                    sources.append(str(path_obj))
+                else:
+                    print(f"⚠ Warning: Path not found: {path_obj}")
+            return sources
+
+    def get_setting(self, key, default=None):
+        """Get an app setting"""
         return self.settings.get(key, default)
-    
+
     def update_setting(self, key, value):
-        """
-        Update a configuration setting
-        
-        Args:
-            key (str): Setting name
-            value: New value
-        """
+        """Update an app setting"""
         self.settings[key] = value
 
 
-# For easy testing
+# Example usage for testing
 if __name__ == "__main__":
     config = Config()
-    print("Configuration loaded successfully!")
+    print("\nConfiguration loaded successfully!")
     print(f"API Key configured: {'Yes' if config.api_key else 'No'}")
-    print(f"Language: {config.get_setting('language')}")
-    print(f"Temperature: {config.get_setting('temperature')}")
+    print(f"Aggregation mode: {config.AGGREGATION_MODE}")
+    print(f"Using sources: {config.get_ingestion_sources()}")

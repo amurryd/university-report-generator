@@ -1,10 +1,14 @@
 # file: create_sample_data.py
 """
 Sample Data Creator
-Creates example CSV files for testing the report generator
+Creates multiple example CSV files for testing the report generator
 
-Run this script once to create sample data files:
-python create_sample_data.py
+Each category (students, finance) is split into multiple CSV files:
+- data/students_semester_<n>.csv
+- data/finance_<month>.csv
+
+Run once:
+    python create_sample_data.py
 """
 
 import pandas as pd
@@ -13,59 +17,56 @@ import random
 
 
 def create_student_data():
-    """Create sample student performance data"""
-    print("Creating sample student data...")
+    """Create separate sample student performance CSVs per semester"""
+    print("Creating sample student data (per semester)...")
 
     first_names = ["Ahmad", "Budi", "Siti", "Dewi", "Eko", "Fitri", "Gita", "Hadi",
                    "Indah", "Joko", "Kartika", "Lina", "Made", "Nur", "Okta"]
     last_names = ["Santoso", "Pratama", "Wijaya", "Kusuma", "Putra", "Putri",
                   "Hidayat", "Rahman", "Sari", "Wati"]
 
-    data = []
-    for i in range(1, 31):
-        nama = f"{random.choice(first_names)} {random.choice(last_names)}"
-        nim = f"210{i:04d}"
+    Path('data/students').mkdir(parents=True, exist_ok=True)
 
-        nilai_mid = random.randint(65, 95)
-        nilai_uas = random.randint(60, 100)
-        nilai_tugas = random.randint(70, 100)
-        nilai_akhir = int(0.3 * nilai_mid + 0.4 * nilai_uas + 0.3 * nilai_tugas)
+    semesters = range(1, 9)
+    for semester in semesters:
+        data = []
+        for i in range(1, 16):  # 15 students per semester
+            nama = f"{random.choice(first_names)} {random.choice(last_names)}"
+            nim = f"21{semester:02d}{i:03d}"
 
-        if nilai_akhir >= 85:
-            ipk = round(random.uniform(3.5, 4.0), 2)
-        elif nilai_akhir >= 70:
-            ipk = round(random.uniform(3.0, 3.5), 2)
-        else:
-            ipk = round(random.uniform(2.5, 3.0), 2)
+            nilai_mid = random.randint(65, 95)
+            nilai_uas = random.randint(60, 100)
+            nilai_tugas = random.randint(70, 100)
+            nilai_akhir = int(0.3 * nilai_mid + 0.4 * nilai_uas + 0.3 * nilai_tugas)
 
-        semester = random.choice([1, 2, 3, 4, 5, 6, 7, 8])
+            if nilai_akhir >= 85:
+                ipk = round(random.uniform(3.5, 4.0), 2)
+            elif nilai_akhir >= 70:
+                ipk = round(random.uniform(3.0, 3.5), 2)
+            else:
+                ipk = round(random.uniform(2.5, 3.0), 2)
 
-        data.append({
-            'NIM': nim,
-            'Nama Mahasiswa': nama,
-            'Semester': semester,
-            'Nilai UTS': nilai_mid,
-            'Nilai UAS': nilai_uas,
-            'Nilai Tugas': nilai_tugas,
-            'Nilai Akhir': nilai_akhir,
-            'IPK': ipk,
-            'Status': 'Aktif' if random.random() > 0.1 else 'Cuti'
-        })
+            data.append({
+                'NIM': nim,
+                'Nama Mahasiswa': nama,
+                'Semester': semester,
+                'Nilai UTS': nilai_mid,
+                'Nilai UAS': nilai_uas,
+                'Nilai Tugas': nilai_tugas,
+                'Nilai Akhir': nilai_akhir,
+                'IPK': ipk,
+                'Status': 'Aktif' if random.random() > 0.1 else 'Cuti'
+            })
 
-    df = pd.DataFrame(data)
-
-    Path('data').mkdir(exist_ok=True)
-
-    output_file = 'data/sample_students.csv'
-    df.to_csv(output_file, index=False, encoding='utf-8-sig')
-    print(f"✓ Created: {output_file}")
-    print(f"  - {len(df)} student records")
-    print(f"  - Columns: {', '.join(df.columns)}\n")
+        df = pd.DataFrame(data)
+        output_file = f"data/students/students_semester_{semester}.csv"
+        df.to_csv(output_file, index=False, encoding='utf-8-sig')
+        print(f"✓ Created: {output_file} ({len(df)} records)")
 
 
 def create_finance_data():
-    """Create sample financial data"""
-    print("Creating sample finance data...")
+    """Create separate sample finance CSVs per month"""
+    print("\nCreating sample finance data (per month)...")
 
     categories = [
         'SPP (Uang Kuliah)',
@@ -80,8 +81,10 @@ def create_finance_data():
 
     months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni']
 
-    data = []
+    Path('data/finance').mkdir(parents=True, exist_ok=True)
+
     for month in months:
+        data = []
         for category in categories:
             if 'SPP' in category:
                 pemasukan = random.randint(150_000_000, 200_000_000)
@@ -107,21 +110,51 @@ def create_finance_data():
                 'Saldo (Rp)': pemasukan - pengeluaran
             })
 
+        df = pd.DataFrame(data)
+        output_file = f"data/finance/finance_{month.lower()}.csv"
+        df.to_csv(output_file, index=False, encoding='utf-8-sig')
+        print(f"✓ Created: {output_file} ({len(df)} records)")
+
+
+def create_akreditasi_data():
+    """Create accreditation (akreditasi) metrics dataset"""
+    print("\nCreating sample akreditasi data...")
+
+    criteria = [
+        "Visi Misi dan Tujuan",
+        "Tata Pamong, Kepemimpinan, dan Kerjasama",
+        "Mahasiswa",
+        "Sumber Daya Manusia",
+        "Keuangan, Sarana, dan Prasarana",
+        "Pendidikan",
+        "Penelitian",
+        "Pengabdian Kepada Masyarakat",
+        "Luaran dan Capaian Tridharma"
+    ]
+
+    Path('data/akreditasi').mkdir(parents=True, exist_ok=True)
+
+    data = []
+    for year in range(2018, 2025):
+        for c in criteria:
+            skor = round(random.uniform(2.5, 4.0), 2)
+            data.append({
+                "Tahun": year,
+                "Kriteria": c,
+                "Skor": skor,
+                "Status": "Memadai" if skor >= 3.0 else "Perlu Peningkatan"
+            })
+
     df = pd.DataFrame(data)
-
-    Path('data').mkdir(exist_ok=True)
-
-    output_file = 'data/sample_finance.csv'
+    output_file = "data/akreditasi/sample_akreditasi.csv"
     df.to_csv(output_file, index=False, encoding='utf-8-sig')
-    print(f"✓ Created: {output_file}")
-    print(f"  - {len(df)} financial records")
-    print(f"  - Columns: {', '.join(df.columns)}\n")
+    print(f"✓ Created: {output_file} ({len(df)} records)")
 
 
 def main():
     """Main function to create all sample data"""
     print("=" * 60)
-    print("SAMPLE DATA CREATOR")
+    print("SAMPLE DATA CREATOR — MULTI FILE MODE")
     print("University AI Report Generator")
     print("=" * 60)
     print()
@@ -129,20 +162,19 @@ def main():
     try:
         create_student_data()
         create_finance_data()
+        create_akreditasi_data()
 
+        print("\n" + "=" * 60)
+        print("✓ All sample CSV files created successfully!")
         print("=" * 60)
-        print("✓ All sample data files created successfully!")
-        print("=" * 60)
-        print()
-        print("Next steps:")
-        print("1. Check the 'data' folder for the CSV files")
-        print("2. You can open them in Excel or any text editor")
-        print("3. Run the main application: python main.py")
-        print("4. Choose option 3 (Demo) to process these files")
+        print("Check your 'data' folder for:")
+        print("- students/students_semester_<n>.csv")
+        print("- finance/finance_<month>.csv")
+        print("- akreditasi/sample_akreditasi.csv")
         print()
 
     except Exception as e:
-        print(f"\n❌ Error creating sample data: {str(e)}")
+        print(f"\n❌ Error creating sample data: {e}")
         print("Make sure you have pandas installed:")
         print("  pip install pandas")
 
