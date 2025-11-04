@@ -1,6 +1,6 @@
 """
 Configuration Module
-Handles API keys, API endpoints, and application settings
+Handles API keys, data ingestion configuration, and application settings
 """
 
 import os
@@ -9,22 +9,21 @@ from pathlib import Path
 
 class Config:
     """
-    Configuration manager for the application
+    Configuration manager for the University Report Generator.
 
     Responsibilities:
     - Load API keys securely
-    - Manage application and data ingestion settings
-    - Provide easy access to configuration values
+    - Manage ingestion sources (local vs API)
+    - Provide settings for report generation
     """
 
     def __init__(self):
-        """Initialize configuration by loading environment variables"""
-        # Load API key from environment variable or .env file
+        # Load Gemini API key from environment or .env
         self.api_key = os.getenv("GEMINI_API_KEY")
         if not self.api_key:
             self._load_from_env_file()
 
-        # Base application settings
+        # === Base Application Settings ===
         self.settings = {
             "max_retries": 3,
             "timeout": 30,
@@ -33,42 +32,38 @@ class Config:
             "model_name": "gemini-2.5-flash",
         }
 
-        # ==============================
-        # DATA INGESTION CONFIGURATION
-        # ==============================
-
-        # Base URL for local fake API (FastAPI)
+        # === Data Ingestion Configuration ===
         self.API_BASE_URL = os.getenv("FAKE_API_BASE_URL", "http://127.0.0.1:8000")
 
-        # Local fallback dataset folders
+        # Local dataset folders
         self.LOCAL_DATA_PATHS = {
-            "student": "data/students",
+            "students": "data/students",
             "finance": "data/finance",
-            "akreditasi": "data/akreditasi/sample_akreditasi.csv",
+            "akreditasi": "data/akreditasi",
         }
 
-        # API endpoints for fetching CSVs
+        # API endpoints for dataset listing
+        # These return JSON describing available CSVs
         self.API_ENDPOINTS = {
-            "student": f"{self.API_BASE_URL}/data/student",
-            "finance": f"{self.API_BASE_URL}/data/finance",
-            "akreditasi": f"{self.API_BASE_URL}/data/akreditasi",
+            "students": f"{self.API_BASE_URL}/data/students?format=json",
+            "finance": f"{self.API_BASE_URL}/data/finance?format=json",
+            "akreditasi": f"{self.API_BASE_URL}/data/akreditasi?format=json",
         }
 
-        # Aggregation & report settings
-        # Default to local if not explicitly overridden
+        # Aggregation mode: local | api
         self.AGGREGATION_MODE = os.getenv("AGGREGATION_MODE", "local").lower()
 
-        # Cache directory
+        # Cache directory for downloaded CSVs
         self.CACHE_DIR = Path("data")
 
         print(f"🔧 Aggregation mode set to: {self.AGGREGATION_MODE}")
 
-    # ------------------------------------------------------
-    # Internal helper methods
-    # ------------------------------------------------------
+    # ----------------------------------------------------------------------
+    # Internal methods
+    # ----------------------------------------------------------------------
 
     def _load_from_env_file(self):
-        """Load API key from .env file"""
+        """Load API key from .env file (fallback)"""
         env_file = Path(".env")
         if env_file.exists():
             with open(env_file, "r", encoding="utf-8") as f:
@@ -81,45 +76,65 @@ class Config:
                                 self.api_key = value.strip()
                                 break
 
-    # ------------------------------------------------------
+    # ----------------------------------------------------------------------
     # Public methods
-    # ------------------------------------------------------
+    # ----------------------------------------------------------------------
 
     def get_api_key(self):
-        """Return Gemini API key or raise error if not set"""
+        """Return Gemini API key"""
         if not self.api_key:
             raise ValueError(
-                "Gemini API key not found! Please configure it in .env or as environment variable."
+                "Gemini API key not found! Please set GEMINI_API_KEY in your environment or .env file."
             )
         return self.api_key
 
     def get_ingestion_sources(self):
         """
-        Get a list of CSV sources (URLs or local paths) based on aggregation mode.
+        Determine where to load CSV data from (local vs API).
 
-        Returns:
-            list[str]: List of CSV URLs or file paths
+        In API mode:
+            - Fetch /data/{dataset}?format=json first
+            - Extract actual download URLs (e.g. /download/students/file.csv)
+            - Prepend base URL
+
+        In Local mode:
+            - Return paths to CSVs in local data folders
         """
         if self.AGGREGATION_MODE == "api":
             print("🌐 Using API-based data ingestion")
-            return list(self.API_ENDPOINTS.values())
+
+            import requests
+            sources = []
+            for dataset, endpoint in self.API_ENDPOINTS.items():
+                try:
+                    resp = requests.get(endpoint, timeout=10)
+                    resp.raise_for_status()
+                    json_data = resp.json()
+
+                    for item in json_data:
+                        url = f"{self.API_BASE_URL}{item['url']}"
+                        sources.append(url)
+                except Exception as e:
+                    print(f"⚠ Failed to fetch dataset '{dataset}' from API: {e}")
+
+            return sources
+
         else:
             print("📁 Using local CSV-based data ingestion")
+
             sources = []
-            for path in self.LOCAL_DATA_PATHS.values():
-                path_obj = Path(path)
-                if path_obj.is_dir():
-                    # Load all CSVs from folder
-                    csv_files = sorted(path_obj.glob("*.csv"))
+            for folder in self.LOCAL_DATA_PATHS.values():
+                folder_path = Path(folder)
+                if folder_path.exists() and folder_path.is_dir():
+                    csv_files = sorted(folder_path.glob("*.csv"))
                     sources.extend([str(p) for p in csv_files])
-                elif path_obj.exists():
-                    sources.append(str(path_obj))
                 else:
-                    print(f"⚠ Warning: Path not found: {path_obj}")
+                    print(f"⚠ Folder not found: {folder_path}")
+
             return sources
 
     def get_setting(self, key, default=None):
-        """Get an app setting"""
+        """Retrieve a config setting"""
         return self.settings.get(key, default)
 
     def update_setting(self, key, value):
@@ -127,10 +142,14 @@ class Config:
         self.settings[key] = value
 
 
-# Example usage for testing
+# ----------------------------------------------------------------------
+# Debug usage
+# ----------------------------------------------------------------------
 if __name__ == "__main__":
     config = Config()
-    print("\nConfiguration loaded successfully!")
-    print(f"API Key configured: {'Yes' if config.api_key else 'No'}")
-    print(f"Aggregation mode: {config.AGGREGATION_MODE}")
-    print(f"Using sources: {config.get_ingestion_sources()}")
+    print("\n🔍 Config Test Output:")
+    print(f"API Key Loaded: {'Yes' if config.api_key else 'No'}")
+    print(f"Mode: {config.AGGREGATION_MODE}")
+    print(f"Ingestion Sources:")
+    for src in config.get_ingestion_sources():
+        print(f" - {src}")

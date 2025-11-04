@@ -12,7 +12,12 @@ python-dotenv>=1.0.0
 # === Networking / API Access ===
 requests>=2.28
 fuzzywuzzy[speedup]>=0.18
+beautifulsoup4>=4.12.2    # For parsing HTML from fake API responses
 
 # === Report Generation / Output ===
-markdown>=3.5.1       # for Markdown → HTML conversion
-jinja2>=3.1.2          # optional: for templating in future (HTML reports)
+markdown>=3.5.1           # For Markdown → HTML conversion
+jinja2>=3.1.2             # Optional: for templating in HTML reports
+
+# === Demo / Local API Server ===
+fastapi>=0.110.0
+uvicorn>=0.30.0
