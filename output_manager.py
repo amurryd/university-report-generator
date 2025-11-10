@@ -124,13 +124,8 @@ class OutputManager:
     # ----------------------------------------------------------
     def convert_to_html(self, markdown_path: Path, metadata: dict = None):
         """
-        Convert a Markdown report into a styled HTML file for printing/exporting.
-
-        Args:
-            markdown_path (Path): path to .md file
-            metadata (dict): optional metadata (for header/footer info)
-        Returns:
-            Path: path to saved .html file
+        Convert a Markdown report into a professionally styled HTML file
+        suitable for printing or PDF export (A4 layout with header/footer).
         """
         if metadata is None:
             metadata = {}
@@ -142,65 +137,141 @@ class OutputManager:
 
         html_body = markdown.markdown(md_text, extensions=["fenced_code", "tables"])
 
-        # Basic HTML template
+        # Clean metadata info
+        report_title = metadata.get("title", "Laporan Universitas")
+        generated_time = datetime.now().strftime("%d %B %Y, %H:%M:%S")
+
+        # Professional print-ready HTML template
         html_template = f"""<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>{metadata.get("title", "Laporan Universitas")}</title>
+    <title>{report_title}</title>
     <style>
+        /* ====== PRINT STYLES (A4 Layout) ====== */
+        @page {{
+            size: A4;
+            margin: 25mm 20mm 25mm 20mm;
+        }}
+        @media print {{
+            body {{
+                margin: 0;
+                padding: 0;
+                background: white;
+            }}
+            header, footer {{
+                position: fixed;
+                left: 0;
+                right: 0;
+                color: #555;
+                font-size: 0.8em;
+            }}
+            header {{
+                top: 0;
+                border-bottom: 1px solid #ccc;
+                padding: 8px 0;
+                text-align: center;
+            }}
+            footer {{
+                bottom: 0;
+                border-top: 1px solid #ccc;
+                padding: 6px 0;
+                text-align: center;
+            }}
+            .page-break {{
+                page-break-before: always;
+            }}
+        }}
+
+        /* ====== GENERAL PAGE STYLES ====== */
         body {{
             font-family: 'Segoe UI', Tahoma, sans-serif;
-            margin: 40px auto;
-            max-width: 900px;
             line-height: 1.6;
             color: #222;
+            margin: 40px auto;
+            max-width: 900px;
         }}
-        h1, h2, h3 {{
-            color: #2c3e50;
+        h1, h2, h3, h4 {{
+            color: #1f3b73;
+            font-weight: 600;
+            margin-top: 1.6em;
+        }}
+        h1 {{
+            text-align: center;
+            border-bottom: 3px solid #1f3b73;
+            padding-bottom: 0.3em;
+        }}
+        h2 {{
+            margin-top: 1.4em;
+            border-left: 5px solid #2c6e91;
+            padding-left: 8px;
+        }}
+        p {{
+            text-align: justify;
+            margin: 0.5em 0;
         }}
         table {{
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
+            font-size: 0.95em;
         }}
         th, td {{
             border: 1px solid #ddd;
-            padding: 8px;
+            padding: 8px 10px;
         }}
         th {{
-            background-color: #f4f4f4;
+            background-color: #f4f6f9;
+            color: #333;
+            text-align: center;
+        }}
+        tr:nth-child(even) {{
+            background-color: #fafafa;
         }}
         code, pre {{
             background-color: #f8f8f8;
-            padding: 2px 5px;
+            padding: 3px 6px;
             border-radius: 4px;
+            font-family: Consolas, monospace;
+            font-size: 0.9em;
         }}
         hr {{
+            border: 0;
+            border-top: 1px solid #ccc;
             margin: 30px 0;
         }}
         footer {{
-            margin-top: 50px;
-            font-size: 0.85em;
-            color: #666;
+            margin-top: 60px;
             text-align: center;
+            color: #666;
+            font-size: 0.85em;
+        }}
+        .page-break {{
+            page-break-before: always;
         }}
     </style>
 </head>
 <body>
-{html_body}
-<hr>
+
+<header>
+    <strong>{report_title}</strong>
+</header>
+
 <footer>
-    <p>Dihasilkan oleh <strong>University AI Report Generator</strong></p>
-    <p>{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+    Dihasilkan oleh <strong>University AI Report Generator</strong> — {generated_time}
 </footer>
+
+<main>
+{html_body}
+</main>
+
 </body>
 </html>"""
 
         with open(html_output_path, "w", encoding="utf-8") as f:
             f.write(html_template)
 
-        print(f"🖨️  HTML version saved: {html_output_path}")
+        print(f"🖨️  Professional HTML version saved: {html_output_path}")
         return html_output_path
 
     # ----------------------------------------------------------
