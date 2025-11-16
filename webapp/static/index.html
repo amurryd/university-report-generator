@@ -1,0 +1,47 @@
+<!-- =========================
+     FILE: webapp/static/index.html
+     ========================= -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>University AI Report Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: auto; }
+        h1 { margin-bottom: 18px; }
+        textarea { width: 100%; height: 120px; margin-top: 8px; padding: 8px; }
+        select, button { padding: 10px; margin-top: 10px; width: 100%; box-sizing: border-box; }
+        #progress { width: 100%; background: #eee; height: 20px; border-radius: 6px; margin-top: 18px; overflow: hidden; }
+        #progress-bar { height: 100%; width: 0%; background: #3b82f6; transition: width 0.25s; }
+        #status { margin-top: 10px; font-weight: 600; }
+        #result { margin-top: 16px; }
+        .small { font-size: 0.9em; color: #555; }
+    </style>
+</head>
+<body>
+
+<h1>University AI Report Generator</h1>
+
+<label for="reportType">Select Report Type</label>
+<select id="reportType">
+    <option value="academic">Academic Report</option>
+    <option value="cooperation">University Cooperation Report</option>
+    <option value="accreditation">Accreditation Report</option>
+</select>
+
+<label for="customPrompt">Custom Prompt (optional)</label>
+<textarea id="customPrompt" placeholder="Add additional instructions for the AI (optional)"></textarea>
+
+<button id="generateBtn">Generate Report</button>
+
+<div id="progress" aria-hidden="false">
+    <div id="progress-bar"></div>
+</div>
+
+<div id="status" class="small">Idle</div>
+
+<div id="result"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
