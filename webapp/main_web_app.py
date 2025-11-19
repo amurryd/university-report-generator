@@ -141,7 +141,7 @@ async def _background_generate(task_id: str, report_type: str, custom_prompt: st
         # 4. Generate AI report (pass custom prompt via data_summary if needed)
         TASKS[task_id].update({"progress": 70, "status": "Generating AI report..."})
         # If your ReportGenerator.generate_report signature differs, adapt here.
-        report_text, usage_info = rg.generate_report(data_summary=analysis, report_type=report_type)
+        report_text, usage_info = rg.generate_report(data_summary=analysis, report_type=report_type, custom_prompt=custom_prompt)
 
         # If generator supports extra prompt injection, you can post-process report_text or modify generate_report.
         # Save report

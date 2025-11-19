@@ -22,7 +22,7 @@ class ReportGenerator:
         self,
         api_key: str,
         model_name: str = "gemini-2.5-flash",
-        prompt_path: str = "prompts/general.json"
+        prompt_path: str = "prompts/prompt_templates.json"
     ):
         """Initialize the ReportGenerator with a GenAI client and load prompt templates."""
         self.client = Client(api_key=api_key)
@@ -37,13 +37,14 @@ class ReportGenerator:
     def generate_report(
         self,
         data_summary: Dict[str, Any],
-        report_type: str = "general"
+        report_type: str = "general",
+        custom_prompt: Optional[str] = None
     ) -> Tuple[str, Dict[str, Optional[int]]]:
         """
         Generate a narrative report in Indonesian using GenAI,
         and return also the token usage metadata.
         """
-        prompt = self._create_prompt(data_summary, report_type)
+        prompt = self._create_prompt(data_summary, report_type, custom_prompt)
         try:
             response = self._call_model_with_retry(prompt)
             text = response.text
@@ -100,7 +101,7 @@ class ReportGenerator:
         with open(path_obj, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    def _create_prompt(self, data_summary: Dict[str, Any], report_type: str) -> str:
+    def _create_prompt(self, data_summary: Dict[str, Any], report_type: str, custom_prompt=None) -> str:
         """Build a prompt using loaded JSON templates."""
         from data_processor import DataProcessor
         processor = DataProcessor()
@@ -116,6 +117,9 @@ class ReportGenerator:
             f"DATA YANG HARUS DIANALISIS:\n{summary_block}\n\n"
             "Tulislah laporan naratif dalam Bahasa Indonesia sesuai struktur di atas:"
         )
+        if custom_prompt:
+            prompt += f"\n\nINSTRUKSI TAMBAHAN DARI PENGGUNA:\n{custom_prompt}\n"
+        
         return prompt
 
     def _call_model_with_retry(self, prompt: str, max_retries: int = 3) -> types.GenerateContentResponse:
