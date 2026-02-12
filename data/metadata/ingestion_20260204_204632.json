@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-02-04T20:46:28.834015",
+  "sources": [
+    {
+      "url": "https://api.simaster.ugm.ac.id/data/v1/test/public/student-aktif",
+      "rows": 24,
+      "columns": 6,
+      "cached": false,
+      "timestamp": "2026-02-04T20:46:30.865396"
+    },
+    {
+      "url": "https://api.simaster.ugm.ac.id/data/v1/test/public/prodi-unggul",
+      "rows": 302,
+      "columns": 9,
+      "cached": false,
+      "timestamp": "2026-02-04T20:46:31.759467"
+    },
+    {
+      "url": "https://api.simaster.ugm.ac.id/data/v1/test/public/staff-guru-besar",
+      "rows": 27,
+      "columns": 6,
+      "cached": false,
+      "timestamp": "2026-02-04T20:46:32.565904"
+    }
+  ],
+  "stats": {
+    "total_sources": 3,
+    "successful": 3,
+    "failed": 0,
+    "cached": 0,
+    "fresh": 3
+  }
+}

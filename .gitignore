@@ -64,3 +64,5 @@ desktop.ini
 .pytest_cache/
 .coverage
 htmlcov/
+
+secrets.toml

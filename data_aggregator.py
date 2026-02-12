@@ -1,221 +1,171 @@
 """
 Data Aggregator Module
 ----------------------
-Combines multiple CSV datasets (students, finance, akreditasi)
-into one unified DataFrame — supporting local files or API sources.
+Combines multiple datasets into one unified DataFrame.
 
-Now supports auto-downloading multiple CSVs per dataset from a local FastAPI demo API.
+Supports:
+- Local CSV ingestion
+- CSV-based APIs (demo/fake API)
+- JSON-based APIs (UGM Datamart)
+- OAuth 2.0 protected APIs
+- Caching
 """
 
-import os
 import pandas as pd
 import requests
 from pathlib import Path
 from io import StringIO
 from bs4 import BeautifulSoup
+import hashlib
 
 
 class DataAggregator:
-    """Aggregates multiple CSV files into one unified dataset."""
-
-    def __init__(self, cache_dir: str = "data", verbose=True):
+    def __init__(self, cache_dir="data", oauth_client=None):
         self.cache_dir = Path(cache_dir)
-        if not self.cache_dir.exists():
-            print(f"⚠ Base directory not found. Creating: {self.cache_dir}")
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-        print(f"📂 DataAggregator initialized with base directory: {self.cache_dir}")
+        self.oauth_client = oauth_client
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+        print(f"📂 DataAggregator initialized with cache directory: {self.cache_dir}")
 
     # --------------------------------------------------------------
-    # HELPER: Parse /data/{dataset} page to find all downloadable CSVs
+    # MAIN INGEST FUNCTION
     # --------------------------------------------------------------
-    def _get_csv_links_from_api(self, api_url: str) -> list[str]:
-        """Fetch list of downloadable CSV URLs from a /data/{dataset} API endpoint."""
+    def ingest(self, sources: list[str], cache: bool = True) -> pd.DataFrame:
+        print("\n🌐 Ingesting data sources...")
+        frames = []
+
+        headers = {}
+        if self.oauth_client:
+            headers.update(self.oauth_client.auth_headers())
+
+        for src in sources:
+            try:
+                # ------------------------------
+                # API SOURCE
+                # ------------------------------
+                if src.startswith("http"):
+                    print(f"🔗 Fetching API: {src}")
+                    resp = requests.get(src, headers=headers, timeout=20)
+                    resp.raise_for_status()
+
+                    content_type = resp.headers.get("Content-Type", "")
+
+                    # ---- JSON API (UGM Datamart) ----
+                    if "application/json" in content_type:
+                        df = self._handle_json_api(src, resp.json(), cache)
+                        if df is not None:
+                            frames.append(df)
+
+                    # ---- CSV or HTML CSV index ----
+                    else:
+                        csv_links = self._get_csv_links_from_api(src)
+                        for link in csv_links:
+                            df = self._download_csv(link, headers, cache)
+                            if df is not None:
+                                frames.append(df)
+
+                # ------------------------------
+                # LOCAL CSV
+                # ------------------------------
+                else:
+                    print(f"📁 Reading local CSV: {src}")
+                    df = pd.read_csv(src, encoding="utf-8-sig")
+                    df["source_type"] = "local"
+                    df["source_file"] = Path(src).name
+                    frames.append(df)
+
+            except Exception as e:
+                print(f"❌ Failed to ingest {src}: {e}")
+
+        if not frames:
+            raise ValueError("❌ No valid data ingested from provided sources.")
+
+        combined_df = pd.concat(frames, ignore_index=True, sort=False)
+        print(f"\n✅ Combined {len(frames)} sources ({len(combined_df)} total rows)")
+        return combined_df
+
+    # --------------------------------------------------------------
+    # JSON API HANDLER (UGM)
+    # --------------------------------------------------------------
+    def _handle_json_api(self, url, payload, cache):
+        # Handle case where payload is directly a list
+        if isinstance(payload, list):
+            records = payload
+        # Handle case where payload is a dict with nested data
+        elif isinstance(payload, dict):
+            records = payload.get("data") or payload.get("items") or payload.get("results")
+        else:
+            print(f"⚠ Unexpected JSON structure from API: {url}")
+            return None
+
+        if not records or not isinstance(records, list):
+            print(f"⚠ No usable records from JSON API: {url}")
+            return None
+
+        df = pd.DataFrame(records)
+        df["source_type"] = "api-json"
+        df["source_endpoint"] = url
+
+        if cache:
+            cache_path = self._cache_path(url)
+            df.to_csv(cache_path, index=False, encoding="utf-8-sig")
+            print(f"💾 Cached JSON API → CSV: {cache_path}")
+
+        print(f"✓ Loaded {len(df)} rows from JSON API")
+        return df
+
+    # --------------------------------------------------------------
+    # CSV AUTO-DISCOVERY (DEMO API)
+    # --------------------------------------------------------------
+    def _get_csv_links_from_api(self, api_url):
         try:
             resp = requests.get(api_url, timeout=10)
             resp.raise_for_status()
 
             soup = BeautifulSoup(resp.text, "html.parser")
             links = [
-                f"http://127.0.0.1:8000{a['href']}"
+                a["href"] if a["href"].startswith("http")
+                else f"{api_url.rstrip('/')}/{a['href'].lstrip('/')}"
                 for a in soup.find_all("a", href=True)
                 if a["href"].endswith(".csv")
             ]
 
-            print(f"   ↳ Found {len(links)} CSV links under {api_url}")
+            print(f"   ↳ Found {len(links)} CSV links")
             return links
+
         except Exception as e:
-            print(f"   ❌ Failed to parse CSV links from {api_url}: {e}")
+            print(f"⚠ CSV discovery failed: {e}")
             return []
 
     # --------------------------------------------------------------
-    # MAIN INGEST FUNCTION
+    # DOWNLOAD CSV
     # --------------------------------------------------------------
-    def ingest(self, sources: list[str], cache: bool = True) -> pd.DataFrame:
-        """
-        Ingest multiple CSV sources (either URLs or local file paths).
-        Optionally caches them under cache_dir.
-        Returns a single combined DataFrame.
-        """
-        print("\n🌐 Ingesting multiple CSV sources...")
-        frames = []
+    def _download_csv(self, url, headers, cache):
+        cache_path = self._cache_path(url)
 
-        for src in sources:
-            try:
-                # ------------------------------
-                # Handle API sources
-                # ------------------------------
-                if src.startswith("http://") or src.startswith("https://"):
-                    print(f"🔗 Fetching from API: {src}")
+        if cache and cache_path.exists():
+            print(f"💾 Loaded from cache: {url}")
+            return pd.read_csv(cache_path)
 
-                    # If /data/{dataset}, auto-fetch all downloadable CSVs
-                    if "/data/" in src:
-                        csv_links = self._get_csv_links_from_api(src)
-                        if not csv_links:
-                            print(f"⚠ No CSV links found for {src}")
-                            continue
+        print(f"⬇ Downloading CSV: {url}")
+        r = requests.get(url, headers=headers, timeout=15)
+        r.raise_for_status()
 
-                        for link in csv_links:
-                            try:
-                                print(f"     ⬇ Downloading {link}")
-                                r = requests.get(link, timeout=10)
-                                r.raise_for_status()
-                                df = pd.read_csv(StringIO(r.text))
-                                if df.empty:
-                                    print(f"     ⚠ Skipped empty CSV: {link}")
-                                    continue
+        df = pd.read_csv(StringIO(r.text))
+        if df.empty:
+            print(f"⚠ Empty CSV skipped: {url}")
+            return None
 
-                                df["source_type"] = "api"
-                                df["source_file"] = link.split("/")[-1]
-                                frames.append(df)
+        df["source_type"] = "api-csv"
+        df["source_file"] = url.split("/")[-1]
 
-                                if cache:
-                                    cache_path = self.cache_dir / df["source_file"].iloc[0]
-                                    df.to_csv(cache_path, index=False, encoding="utf-8-sig")
-                                    print(f"     💾 Cached: {cache_path}")
+        if cache:
+            df.to_csv(cache_path, index=False, encoding="utf-8-sig")
 
-                            except Exception as e:
-                                print(f"     ❌ Failed to download {link}: {e}")
-
-                        continue  # move to next dataset after fetching its CSVs
-
-                    # Otherwise, just read a single remote CSV
-                    resp = requests.get(src, timeout=15)
-                    resp.raise_for_status()
-                    df = pd.read_csv(StringIO(resp.text))
-                    df["source_type"] = "api"
-                    df["source_file"] = Path(src).name
-                    frames.append(df)
-
-                # ------------------------------
-                # Handle local CSV files
-                # ------------------------------
-                else:
-                    print(f"📁 Reading local CSV: {src}")
-                    df = pd.read_csv(src)
-                    if df.empty:
-                        print(f"⚠ Empty dataset skipped: {src}")
-                        continue
-                    df["source_type"] = "local"
-                    df["source_file"] = Path(src).name
-                    frames.append(df)
-
-                    if cache:
-                        cache_name = Path(src).name
-                        cache_path = self.cache_dir / cache_name
-                        df.to_csv(cache_path, index=False, encoding="utf-8-sig")
-                        print(f"💾 Cached: {cache_path}")
-
-            except Exception as e:
-                print(f"❌ Failed to ingest {src}: {e}")
-
-        # ------------------------------
-        # Combine all datasets
-        # ------------------------------
-        if not frames:
-            raise ValueError("❌ No valid data ingested from provided sources.")
-
-        combined_df = pd.concat(frames, ignore_index=True, sort=False)
-        print(f"\n✅ Ingested and combined {len(frames)} sources ({len(combined_df)} total rows).")
-        return combined_df
+        return df
 
     # --------------------------------------------------------------
-    # Read local folders (used in offline/local mode)
+    # CACHE HELPER
     # --------------------------------------------------------------
-    def _read_csv_files_from_folder(self, folder_name: str) -> pd.DataFrame:
-        folder_path = self.cache_dir / folder_name
-        if not folder_path.exists():
-            print(f"⚠ Folder not found: {folder_path}")
-            return pd.DataFrame()
-
-        csv_files = list(folder_path.glob("*.csv"))
-        if not csv_files:
-            print(f"⚠ No CSV files found in {folder_path}")
-            return pd.DataFrame()
-
-        frames = []
-        for csv_file in csv_files:
-            try:
-                df = pd.read_csv(csv_file)
-                df["source_type"] = folder_name
-                df["source_file"] = csv_file.name
-                frames.append(df)
-                print(f"  ✓ Loaded {csv_file.name} ({len(df)} rows)")
-            except Exception as e:
-                print(f"  ❌ Error reading {csv_file.name}: {e}")
-
-        if frames:
-            combined = pd.concat(frames, ignore_index=True)
-            print(f"✅ Combined {len(frames)} CSVs from '{folder_name}' ({len(combined)} total rows)")
-            return combined
-        return pd.DataFrame()
-
-    # --------------------------------------------------------------
-    # Aggregate all or selected datasets
-    # --------------------------------------------------------------
-    def aggregate_all(self) -> pd.DataFrame:
-        print("\n📊 Aggregating all datasets...")
-        datasets = {}
-        for folder in ["students", "finance", "akreditasi"]:
-            df = self._read_csv_files_from_folder(folder)
-            if not df.empty:
-                datasets[folder] = df
-
-        if not datasets:
-            print("❌ No data found in any folder.")
-            return pd.DataFrame()
-
-        combined_df = pd.concat(datasets.values(), ignore_index=True, sort=False)
-        print(f"\n✅ Aggregated dataset created with {len(combined_df)} total rows and {len(combined_df.columns)} columns.")
-        print(f"   Source breakdown: {', '.join(datasets.keys())}")
-        return combined_df
-
-    def aggregate_selected(self, folders: list[str]) -> pd.DataFrame:
-        print(f"\n📊 Aggregating selected datasets: {', '.join(folders)}")
-        frames = []
-        for folder in folders:
-            df = self._read_csv_files_from_folder(folder)
-            if not df.empty:
-                frames.append(df)
-
-        if frames:
-            combined = pd.concat(frames, ignore_index=True, sort=False)
-            print(f"✅ Aggregated {len(frames)} selected datasets ({len(combined)} total rows)")
-            return combined
-        print("⚠ No valid data found in selected folders.")
-        return pd.DataFrame()
-
-
-if __name__ == "__main__":
-    aggregator = DataAggregator(cache_dir="data")
-    # Example demo with fake API endpoints
-    sources = [
-        "http://127.0.0.1:8000/data/students",
-        "http://127.0.0.1:8000/data/finance",
-        "http://127.0.0.1:8000/data/akreditasi",
-    ]
-    combined_df = aggregator.ingest(sources)
-    if not combined_df.empty:
-        print("\n--- SAMPLE OUTPUT ---")
-        print(combined_df.head())
-    else:
-        print("No combined data available.")
+    def _cache_path(self, key):
+        return self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.csv"
