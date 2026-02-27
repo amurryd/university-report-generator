@@ -18,6 +18,7 @@ from data_processor import DataProcessor
 from report_generator import ReportGenerator
 from output_manager import OutputManager
 from oauth_client import OAuthClient
+from storage_manager import StorageManager
 
 
 # =========================================
@@ -55,6 +56,24 @@ st.title("🎓 LED IAPT 4.1 Report Generator")
 st.caption("Laporan Evaluasi Diri untuk Akreditasi Perguruan Tinggi - BAN-PT")
 
 st.divider()
+
+
+# =========================================
+# Initialize Config and Storage Manager
+# =========================================
+cfg = Config()
+
+@st.cache_resource
+def get_storage_manager():
+    """Initialize and cache storage manager"""
+    try:
+        storage = StorageManager(**cfg.get_postgres_config())
+        return storage
+    except Exception as e:
+        st.sidebar.warning(f"⚠️ Database not available: {e}")
+        return None
+
+storage = get_storage_manager()
 
 
 # =========================================
@@ -140,6 +159,44 @@ with st.sidebar.expander("⚙️ Advanced Settings"):
     show_data_preview = st.checkbox("Show Data Preview", value=True)
     show_token_usage = st.checkbox("Show Token Usage Details", value=True)
 
+# Report History in Sidebar
+if storage:
+    st.sidebar.divider()
+    st.sidebar.subheader("📚 Report History")
+    
+    try:
+        reports = storage.list_reports(
+            report_type="led_iapt_4.1",
+            limit=10
+        )
+        
+        if reports:
+            for report in reports:
+                with st.sidebar.expander(f"📄 {report['title'][:35]}..."):
+                    st.caption(f"🕒 {report['created_at'].strftime('%Y-%m-%d %H:%M')}")
+                    st.caption(f"📝 {report['word_count']:,} words")
+                    st.caption(f"Status: {report['status']}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Load", key=f"load_{report['id']}"):
+                            loaded_report = storage.get_report(report['id'])
+                            st.session_state.report_text = loaded_report['content']
+                            st.session_state.original_report = loaded_report['content']
+                            st.success("✅ Report loaded!")
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("Del", key=f"del_{report['id']}"):
+                            storage.delete_report(report['id'])
+                            st.success("🗑️ Deleted!")
+                            st.rerun()
+        else:
+            st.sidebar.info("No saved reports yet")
+            
+    except Exception as e:
+        st.sidebar.error(f"Error loading history: {e}")
+
 
 # =========================================
 # Main Input – Custom Prompt
@@ -204,7 +261,7 @@ if st.session_state.edit_mode is None:
 # =========================================
 button_label = "🚀 Generate Complete Report" if generation_mode == "Complete Report (All Sections)" else f"📝 Generate {LED_SECTIONS[selected_section].split('.')[1].split('(')[0].strip()}"
 
-if st.button(button_label, type="primary", use_container_width=True):
+if st.button(button_label, type="primary", width="stretch"):
     # Reset state
     st.session_state.report_text = None
     st.session_state.last_error = None
@@ -217,9 +274,8 @@ if st.button(button_label, type="primary", use_container_width=True):
 
     try:
         # ---------------------------------
-        # 1. Load config
+        # 1. Load config (already done above)
         # ---------------------------------
-        cfg = Config()
         progress.progress(5, text="Loading configuration...")
 
         # ---------------------------------
@@ -330,6 +386,51 @@ if st.button(button_label, type="primary", use_container_width=True):
 
         progress.progress(100, text="Completed!")
         st.success("✅ Report generated successfully!")
+        
+        # ---------------------------------
+        # 7. Save to database (if available)
+        # ---------------------------------
+        if storage and st.session_state.report_text:
+            try:
+                final_report = st.session_state.report_text
+                
+                # Determine report title
+                if generation_mode == "Complete Report (All Sections)":
+                    report_title = f"LED IAPT 4.1 - Complete Report"
+                else:
+                    section_name = LED_SECTIONS[selected_section].split('.')[1].split('(')[0].strip()
+                    report_title = f"LED IAPT 4.1 - {section_name}"
+                
+                # Save to database
+                report_id = storage.save_report(
+                    content=final_report,
+                    report_type="led_iapt_4.1",
+                    section=selected_section if generation_mode == "Individual Section" else None,
+                    title=f"{report_title} - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                    metadata={
+                        'generation_mode': generation_mode,
+                        'word_count': len(final_report.split()),
+                        'custom_prompt': custom_prompt if custom_prompt else None,
+                        'api_count': len(api_endpoints) if api_endpoints else 0,
+                    },
+                    status='draft'
+                )
+                
+                # Track token usage if available
+                if st.session_state.usage:
+                    usage = st.session_state.usage
+                    storage.track_token_usage(
+                        report_id=report_id,
+                        prompt_tokens=usage.get('prompt_tokens', 0),
+                        output_tokens=usage.get('output_tokens', 0),
+                        total_tokens=usage.get('total_tokens', 0),
+                        model_name="gemini-2.5-flash"
+                    )
+                
+                st.info(f"💾 Report saved to database (ID: {report_id})")
+                
+            except Exception as e:
+                st.warning(f"⚠️ Report generated but could not save to database: {e}")
 
     except Exception as e:
         st.session_state.last_error = traceback.format_exc()
@@ -370,7 +471,7 @@ if st.session_state.ingested_df is not None and show_data_preview:
         tab1, tab2, tab3 = st.tabs(["📋 Raw Data", "📈 Analysis Summary", "🔍 Data Quality"])
         
         with tab1:
-            st.dataframe(df.head(50), use_container_width=True)
+            st.dataframe(df.head(50), width="stretch")
         
         with tab2:
             if st.session_state.analysis:
@@ -463,7 +564,7 @@ if st.session_state.report_text:
     with col2:
         if st.button(
             "✏️ Edit Report" if not st.session_state.edit_mode else "👁️ Preview Mode",
-            use_container_width=True,
+            width="stretch",
             type="primary" if not st.session_state.edit_mode else "secondary"
         ):
             st.session_state.edit_mode = not st.session_state.edit_mode
@@ -471,7 +572,7 @@ if st.session_state.report_text:
     
     with col3:
         if st.session_state.edited_report and st.session_state.original_report:
-            if st.button("🔄 Restore Original", use_container_width=True):
+            if st.button("🔄 Restore Original", width="stretch"):
                 st.session_state.edited_report = None
                 st.session_state.edit_mode = False
                 st.success("✅ Restored to original AI-generated version")
@@ -513,7 +614,7 @@ if st.session_state.report_text:
                 st.caption(f"Word count change: {words_changed:+d} words")
             
             with col2:
-                if st.button("💾 Save Changes", use_container_width=True, type="primary"):
+                if st.button("💾 Save Changes", width="stretch", type="primary"):
                     # Save to edit history
                     st.session_state.edit_history.append({
                         'timestamp': datetime.now().isoformat(),
@@ -527,7 +628,7 @@ if st.session_state.report_text:
                     st.rerun()
             
             with col3:
-                if st.button("❌ Discard", use_container_width=True):
+                if st.button("❌ Discard", width="stretch"):
                     st.session_state.edit_mode = False
                     st.rerun()
         
@@ -618,10 +719,9 @@ if st.session_state.report_text:
             if find_text:
                 import re
                 if case_sensitive:
-                    pattern = find_text
+                    pattern = re.escape(find_text)
                 else:
                     pattern = re.escape(find_text)
-                    matches = re.findall(pattern, current_text, re.IGNORECASE)
                 
                 if whole_word:
                     pattern = r'\b' + pattern + r'\b'
@@ -637,7 +737,7 @@ if st.session_state.report_text:
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    if st.button("🔄 Replace All", use_container_width=True, type="primary"):
+                    if st.button("🔄 Replace All", width="stretch", type="primary"):
                         if find_text and replace_text is not None:
                             try:
                                 if case_sensitive:
@@ -652,7 +752,7 @@ if st.session_state.report_text:
                                 st.error(f"Error: {e}")
                 
                 with col2:
-                    if st.button("Preview Changes", use_container_width=True):
+                    if st.button("Preview Changes", width="stretch"):
                         if find_text:
                             # Show preview with highlights
                             preview = current_text[:500]
@@ -757,7 +857,7 @@ if st.session_state.report_text:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        if st.button("🔄 Regenerate", use_container_width=True):
+        if st.button("🔄 Regenerate", width="stretch"):
             st.session_state.report_text = None
             st.session_state.edited_report = None
             st.session_state.validation_results = None
@@ -768,7 +868,7 @@ if st.session_state.report_text:
         # Determine which version to save
         final_report = st.session_state.edited_report if st.session_state.edited_report else st.session_state.report_text
         
-        if st.button("✅ Approve & Save", type="primary", use_container_width=True):
+        if st.button("✅ Approve & Save", type="primary", width="stretch"):
             try:
                 out = OutputManager()
                 
@@ -805,14 +905,14 @@ if st.session_state.report_text:
                     st.code(traceback.format_exc())
 
     with col3:
-        if st.button("📋 Copy to Clipboard", use_container_width=True):
+        if st.button("📋 Copy to Clipboard", width="stretch"):
             # This would require JavaScript - showing a message instead
             st.info("💡 Use the Raw Markdown tab above to copy the text")
     
     with col4:
         if st.session_state.edited_report:
             # Compare with original
-            if st.button("🔍 Compare Versions", use_container_width=True):
+            if st.button("🔍 Compare Versions", width="stretch"):
                 st.session_state.show_diff = True
                 st.rerun()
 
@@ -870,7 +970,7 @@ if st.session_state.html_path:
                 data=f,
                 file_name=Path(st.session_state.html_path).name,
                 mime="text/html",
-                use_container_width=True,
+                width="stretch",
             )
     
     with col2:
@@ -881,7 +981,7 @@ if st.session_state.html_path:
             data=final_report,
             file_name=Path(st.session_state.html_path).stem + ".md",
             mime="text/markdown",
-            use_container_width=True,
+            width="stretch",
         )
 
 
@@ -898,7 +998,7 @@ if generation_mode == "Individual Section" and st.session_state.generated_sectio
     with col1:
         st.info(f"✓ {len(sections_list)} section(s) generated")
     with col2:
-        if st.button("🗑️ Clear All", use_container_width=True):
+        if st.button("🗑️ Clear All", width="stretch"):
             st.session_state.generated_sections = {}
             st.rerun()
     

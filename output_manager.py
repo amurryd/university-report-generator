@@ -91,19 +91,27 @@ class OutputManager:
         if metadata:
             if "source_file" in metadata:
                 header_lines.append(f"Source: {metadata['source_file']}")
+            
+            # --- FIXED VALIDATION CHECK ---
             if "validation" in metadata:
                 val = metadata["validation"]
-                header_lines.append(f"Validation: {'✓ Pass' if val.get('is_valid') else '⚠ Issues detected'}")
+                # Use isinstance to ensure 'val' is a dict and not None
+                if isinstance(val, dict):
+                    status = "✓ Pass" if val.get("is_valid") else "⚠ Issues detected"
+                    header_lines.append(f"Validation: {status}")
+                else:
+                    header_lines.append("Validation: Not performed")
 
+            # --- FIXED TOKEN USAGE CHECK ---
             if "token_usage" in metadata:
-                usage = metadata.get("token_usage") or {}
-                pt = usage.get("prompt_tokens")
-                ot = usage.get("output_tokens")
-                tt = usage.get("total_tokens")
-                pt_s = str(pt) if pt is not None else "n/a"
-                ot_s = str(ot) if ot is not None else "n/a"
-                tt_s = str(tt) if tt is not None else "n/a"
-                header_lines.append(f"Token Usage: prompt={pt_s}, output={ot_s}, total={tt_s}")
+                usage = metadata.get("token_usage")
+                if isinstance(usage, dict):
+                    pt = usage.get("prompt_tokens", "n/a")
+                    ot = usage.get("output_tokens", "n/a")
+                    tt = usage.get("total_tokens", "n/a")
+                    header_lines.append(f"Token Usage: prompt={pt}, output={ot}, total={tt}")
+                else:
+                    header_lines.append("Token Usage: n/a")
 
         header_lines.append("Generator: University AI Report Generator")
         header_lines.append("---\n")

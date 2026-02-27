@@ -5,7 +5,7 @@ Handles API keys, data ingestion configuration, and application settings
 
 import os
 from pathlib import Path
-
+from dotenv import load_dotenv
 
 class Config:
     """
@@ -18,6 +18,8 @@ class Config:
     """
 
     def __init__(self):
+        load_dotenv()  # ← NEW
+        
         # Load Gemini API key from environment or .env
         self.api_key = os.getenv("GEMINI_API_KEY")
         if not self.api_key:
@@ -57,6 +59,15 @@ class Config:
         self.CACHE_DIR = Path("data")
 
         print(f"🔧 Aggregation mode set to: {self.AGGREGATION_MODE}")
+
+        # PostgreSQL Configuration
+        self.POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+        self.POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
+        self.POSTGRES_DB = os.getenv("POSTGRES_DB", "led_reports")
+        self.POSTGRES_USER = os.getenv("POSTGRES_USER", "led_user")
+        self.POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+        self.POSTGRES_MIN_CONN = int(os.getenv("POSTGRES_MIN_CONNECTIONS", "1"))
+        self.POSTGRES_MAX_CONN = int(os.getenv("POSTGRES_MAX_CONNECTIONS", "10"))
 
     # ----------------------------------------------------------------------
     # Internal methods
@@ -140,6 +151,18 @@ class Config:
     def update_setting(self, key, value):
         """Update an app setting"""
         self.settings[key] = value
+
+    def get_postgres_config(self):
+        """Get PostgreSQL configuration dictionary"""
+        return {
+            'host': self.POSTGRES_HOST,
+            'port': self.POSTGRES_PORT,
+            'database': self.POSTGRES_DB,
+            'user': self.POSTGRES_USER,
+            'password': self.POSTGRES_PASSWORD,
+            'min_connections': self.POSTGRES_MIN_CONN,
+            'max_connections': self.POSTGRES_MAX_CONN
+        }
 
 
 # ----------------------------------------------------------------------
