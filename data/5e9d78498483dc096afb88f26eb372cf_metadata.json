@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-04-17T14:39:38.858841",
+  "url": "https://api.simaster.ugm.ac.id/data/v1/test/public/prodi-unggul",
+  "row_count": 302,
+  "column_count": 8,
+  "columns": [
+    "level",
+    "prodi",
+    "nama_lembaga",
+    "fakultas",
+    "negara",
+    "akreditasi",
+    "source_type",
+    "source_endpoint"
+  ],
+  "source_type": "api-json",
+  "source_endpoint": "https://api.simaster.ugm.ac.id/data/v1/test/public/prodi-unggul"
+}

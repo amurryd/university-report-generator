@@ -295,8 +295,10 @@ if st.button(button_label, type="primary", width="stretch"):
         # 3. Data ingestion
         # ---------------------------------
         aggregator = DataAggregator(
-            cache_dir=str(cfg.CACHE_DIR), oauth_client=oauth_client
-        )
+    cache_dir=cfg.cache_dir,          # Use config
+    oauth_client=oauth_client,
+    cache_ttl_hours=cfg.cache_ttl_hours  # ADD THIS
+)
 
         # Determine sources based on mode
         if aggregation_mode == "local":

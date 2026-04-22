@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-04-17T14:39:37.903895",
+  "url": "https://api.simaster.ugm.ac.id/data/v1/test/public/student-aktif",
+  "row_count": 24,
+  "column_count": 5,
+  "columns": [
+    "jenjang",
+    "jumlah",
+    "periode_semester",
+    "source_type",
+    "source_endpoint"
+  ],
+  "source_type": "api-json",
+  "source_endpoint": "https://api.simaster.ugm.ac.id/data/v1/test/public/student-aktif"
+}

@@ -8,7 +8,7 @@ Supports:
 - CSV-based APIs (demo/fake API)
 - JSON-based APIs (UGM Datamart)
 - OAuth 2.0 protected APIs
-- Caching
+- Caching with TTL (Time-to-Live)
 """
 
 import pandas as pd
@@ -17,15 +17,19 @@ from pathlib import Path
 from io import StringIO
 from bs4 import BeautifulSoup
 import hashlib
+import json
+from datetime import datetime, timedelta
 
 
 class DataAggregator:
-    def __init__(self, cache_dir="data", oauth_client=None):
+    def __init__(self, cache_dir="data", oauth_client=None, cache_ttl_hours=24):
         self.cache_dir = Path(cache_dir)
         self.oauth_client = oauth_client
+        self.cache_ttl = timedelta(hours=cache_ttl_hours)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"📂 DataAggregator initialized with cache directory: {self.cache_dir}")
+        print(f"⏰ Cache TTL: {cache_ttl_hours} hours")
 
     # --------------------------------------------------------------
     # MAIN INGEST FUNCTION
@@ -88,6 +92,13 @@ class DataAggregator:
     # JSON API HANDLER (UGM)
     # --------------------------------------------------------------
     def _handle_json_api(self, url, payload, cache):
+        # Check cache first (with TTL)
+        if cache:
+            cached_df = self._load_from_cache(url)
+            if cached_df is not None:
+                print(f"💾 Loaded from cache (fresh): {url}")
+                return cached_df
+        
         # Handle case where payload is directly a list
         if isinstance(payload, list):
             records = payload
@@ -107,9 +118,7 @@ class DataAggregator:
         df["source_endpoint"] = url
 
         if cache:
-            cache_path = self._cache_path(url)
-            df.to_csv(cache_path, index=False, encoding="utf-8-sig")
-            print(f"💾 Cached JSON API → CSV: {cache_path}")
+            self._save_to_cache(url, df)
 
         print(f"✓ Loaded {len(df)} rows from JSON API")
         return df
@@ -138,14 +147,15 @@ class DataAggregator:
             return []
 
     # --------------------------------------------------------------
-    # DOWNLOAD CSV
+    # DOWNLOAD CSV (with TTL caching)
     # --------------------------------------------------------------
     def _download_csv(self, url, headers, cache):
-        cache_path = self._cache_path(url)
-
-        if cache and cache_path.exists():
-            print(f"💾 Loaded from cache: {url}")
-            return pd.read_csv(cache_path)
+        # Check cache first (with TTL)
+        if cache:
+            cached_df = self._load_from_cache(url)
+            if cached_df is not None:
+                print(f"💾 Loaded from cache (fresh): {url}")
+                return cached_df
 
         print(f"⬇ Downloading CSV: {url}")
         r = requests.get(url, headers=headers, timeout=15)
@@ -160,12 +170,88 @@ class DataAggregator:
         df["source_file"] = url.split("/")[-1]
 
         if cache:
-            df.to_csv(cache_path, index=False, encoding="utf-8-sig")
+            self._save_to_cache(url, df)
 
         return df
 
     # --------------------------------------------------------------
-    # CACHE HELPER
+    # CACHE HELPERS (with TTL)
     # --------------------------------------------------------------
     def _cache_path(self, key):
+        """Get cache file path for data"""
         return self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}.csv"
+    
+    def _metadata_path(self, key):
+        """Get metadata file path for cache"""
+        return self.cache_dir / f"{hashlib.md5(key.encode()).hexdigest()}_metadata.json"
+    
+    def _load_from_cache(self, url):
+        """Load data from cache if it exists and is fresh (within TTL)"""
+        cache_path = self._cache_path(url)
+        metadata_path = self._metadata_path(url)
+        
+        # Check if both files exist
+        if not cache_path.exists() or not metadata_path.exists():
+            return None
+        
+        try:
+            # Load metadata
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            
+            # Check cache age
+            cache_time = datetime.fromisoformat(metadata['timestamp'])
+            age = datetime.now() - cache_time
+            
+            if age > self.cache_ttl:
+                print(f"🕐 Cache expired ({age.total_seconds()/3600:.1f}h old): {url}")
+                return None  # Cache too old
+            
+            # Load data
+            df = pd.read_csv(cache_path, encoding="utf-8-sig")
+            
+            # Restore metadata columns
+            df["source_type"] = metadata.get("source_type", "api")
+            if "source_endpoint" in metadata:
+                df["source_endpoint"] = metadata["source_endpoint"]
+            if "source_file" in metadata:
+                df["source_file"] = metadata["source_file"]
+            
+            return df
+            
+        except Exception as e:
+            print(f"⚠ Cache read failed: {e}")
+            return None
+    
+    def _save_to_cache(self, url, df):
+        """Save data to cache with metadata"""
+        cache_path = self._cache_path(url)
+        metadata_path = self._metadata_path(url)
+        
+        try:
+            # Save data
+            df.to_csv(cache_path, index=False, encoding="utf-8-sig")
+            
+            # Save metadata
+            metadata = {
+                'timestamp': datetime.now().isoformat(),
+                'url': url,
+                'row_count': len(df),
+                'column_count': len(df.columns),
+                'columns': df.columns.tolist(),
+                'source_type': df.get('source_type', ['unknown'])[0] if 'source_type' in df.columns else 'unknown'
+            }
+            
+            # Add source-specific metadata
+            if 'source_endpoint' in df.columns:
+                metadata['source_endpoint'] = df['source_endpoint'].iloc[0]
+            if 'source_file' in df.columns:
+                metadata['source_file'] = df['source_file'].iloc[0]
+            
+            with open(metadata_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
+            print(f"💾 Cached data + metadata: {cache_path.name}")
+            
+        except Exception as e:
+            print(f"⚠ Cache save failed: {e}")

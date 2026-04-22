@@ -68,6 +68,10 @@ class Config:
         self.POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
         self.POSTGRES_MIN_CONN = int(os.getenv("POSTGRES_MIN_CONNECTIONS", "1"))
         self.POSTGRES_MAX_CONN = int(os.getenv("POSTGRES_MAX_CONNECTIONS", "10"))
+        
+        
+        self.cache_ttl_hours = int(os.getenv('CACHE_TTL_HOURS', '24'))
+        self.cache_dir = os.getenv('CACHE_DIR', 'data/cache')
 
     # ----------------------------------------------------------------------
     # Internal methods

@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-04-17T14:39:39.792903",
+  "url": "https://api.simaster.ugm.ac.id/data/v1/test/public/staff-guru-besar",
+  "row_count": 27,
+  "column_count": 5,
+  "columns": [
+    "tahun",
+    "jumlah",
+    "jabatan",
+    "source_type",
+    "source_endpoint"
+  ],
+  "source_type": "api-json",
+  "source_endpoint": "https://api.simaster.ugm.ac.id/data/v1/test/public/staff-guru-besar"
+}
